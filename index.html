@@ -1,0 +1,2891 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Los Santos Online 3D — Mobile & Desktop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #05070c;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #gameCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 1;
+            touch-action: none;
+        }
+
+        #comicLoader {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            background: #050608;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.7s ease;
+        }
+
+        #comicLoader.zoom-out {
+            transform: scale(1.14);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .comic-grid {
+            position: absolute;
+            inset: -2%;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 8px;
+            padding: 10px;
+            background: #040507;
+        }
+
+        .comic-panel {
+            position: relative;
+            border: 4px solid #040507;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.55), 0 8px 24px rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            transform: translateY(20px) scale(0.96);
+            animation: panelSlideIn 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .comic-panel svg {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        @keyframes panelSlideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .gta-emblem-wrap {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.88);
+            z-index: 10;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            animation: emblemPop 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+        }
+
+        @keyframes emblemPop {
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .gta-title-line {
+            font-weight: 900;
+            font-size: clamp(2.1rem, 6vw, 4.1rem);
+            line-height: 0.88;
+            letter-spacing: -0.04em;
+            color: #ffffff;
+            text-transform: lowercase;
+            -webkit-text-stroke: 3px #050608;
+            paint-order: stroke fill;
+            text-shadow: 0 6px 0 #050608, 0 14px 30px rgba(0, 0, 0, 0.9);
+        }
+
+        .gta-online-badge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 3px 16px;
+            background: #dc2626;
+            border: 3px solid #050608;
+            border-radius: 6px;
+            font-weight: 900;
+            font-size: clamp(1.1rem, 3.2vw, 2rem);
+            letter-spacing: 0.14em;
+            color: #050608;
+            text-transform: uppercase;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.85);
+        }
+
+        .glass-panel {
+            background: rgba(10, 14, 24, 0.84);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.65);
+        }
+
+        .star-icon {
+            font-size: 1.45rem;
+            line-height: 1;
+            color: #facc15;
+            text-shadow: 0 0 12px rgba(250, 204, 21, 0.9), 0 2px 6px rgba(0, 0, 0, 0.9);
+        }
+
+        .star-icon.blink {
+            animation: wantedStarBlink 0.44s infinite alternate ease-in-out;
+        }
+
+        @keyframes wantedStarBlink {
+            0% { opacity: 1; transform: scale(1.12); }
+            100% { opacity: 0.22; transform: scale(0.9); }
+        }
+
+        .touch-pad {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .touch-btn {
+            touch-action: none;
+            transition: transform 0.08s ease, background-color 0.12s ease;
+        }
+
+        .touch-btn:active, .touch-btn.pressed {
+            transform: scale(0.92);
+            filter: brightness(1.25);
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.45);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.55);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 1. COMIC LOADING SCREEN -->
+    <div id="comicLoader">
+        <div class="comic-grid">
+            <div class="comic-panel col-span-4 row-span-2" style="animation-delay: 0.05s;">
+                <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                        <linearGradient id="skyJet" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#38bdf8"/>
+                            <stop offset="55%" stop-color="#bae6fd"/>
+                            <stop offset="100%" stop-color="#f59e0b"/>
+                        </linearGradient>
+                    </defs>
+                    <rect width="400" height="220" fill="url(#skyJet)"/>
+                    <polygon points="0,175 130,135 280,155 400,125 400,220 0,220" fill="#b45309"/>
+                    <polygon points="0,195 190,165 400,185 400,220 0,220" fill="#78350f"/>
+                    <g transform="translate(185,95) rotate(-14)">
+                        <polygon points="-95,12 0,-8 105,6 0,20" fill="#cbd5e1" stroke="#0f172a" stroke-width="3"/>
+                        <polygon points="-35,-36 18,0 -25,42 -12,0" fill="#94a3b8" stroke="#0f172a" stroke-width="3"/>
+                        <ellipse cx="26" cy="2" rx="22" ry="7" fill="#0284c7" stroke="#0f172a" stroke-width="2.5"/>
+                    </g>
+                </svg>
+            </div>
+            <div class="comic-panel col-span-4 row-span-2" style="animation-delay: 0.14s;">
+                <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice">
+                    <rect width="400" height="220" fill="#fef08a"/>
+                    <circle cx="115" cy="82" r="30" fill="#451a03" stroke="#050608" stroke-width="3"/>
+                    <path d="M60,220 L76,112 L156,112 L172,220 Z" fill="#db2777" stroke="#050608" stroke-width="3"/>
+                    <circle cx="285" cy="88" r="24" fill="#fed7aa" stroke="#050608" stroke-width="3"/>
+                    <path d="M240,220 L252,118 L322,118 L334,220 Z" fill="#e2e8f0" stroke="#050608" stroke-width="3"/>
+                </svg>
+            </div>
+            <div class="comic-panel col-span-4 row-span-2" style="animation-delay: 0.22s;">
+                <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice">
+                    <rect width="400" height="220" fill="#cbd5e1"/>
+                    <circle cx="200" cy="78" r="30" fill="#fdba74" stroke="#050608" stroke-width="3"/>
+                    <path d="M140,220 L156,112 L248,112 L266,220 Z" fill="#292524" stroke="#050608" stroke-width="3"/>
+                </svg>
+            </div>
+            <div class="comic-panel col-span-6 row-span-4" style="animation-delay: 0.18s;">
+                <svg viewBox="0 0 500 320" preserveAspectRatio="xMidYMid slice">
+                    <rect width="500" height="320" fill="#fde047"/>
+                    <polygon points="0,320 180,100 360,320" fill="#f97316" opacity="0.65"/>
+                    <polygon points="30,220 155,145 435,160 480,255 450,310 30,310" fill="#3b0764" stroke="#050608" stroke-width="4"/>
+                </svg>
+            </div>
+            <div class="comic-panel col-span-6 row-span-4" style="animation-delay: 0.28s;">
+                <svg viewBox="0 0 500 320" preserveAspectRatio="xMidYMid slice">
+                    <rect width="500" height="205" fill="#1e1b4b"/>
+                    <rect y="205" width="500" height="115" fill="#0f172a"/>
+                    <polygon points="210,225 275,155 445,162 485,245 470,295 210,295" fill="#4c1d95" stroke="#050608" stroke-width="4"/>
+                    <rect x="235" y="226" width="225" height="12" fill="#ef4444"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="gta-emblem-wrap">
+            <div class="gta-title-line">grand</div>
+            <div class="gta-title-line">theft</div>
+            <div class="gta-title-line">auto</div>
+            <div class="gta-online-badge">ONLINE</div>
+        </div>
+
+        <div class="relative z-20 mt-auto w-full bg-gradient-to-t from-black via-black/90 to-transparent pt-10 pb-5 px-5 sm:px-10">
+            <div class="max-w-3xl mx-auto">
+                <div class="flex items-center justify-between text-xs sm:text-sm font-extrabold tracking-wider uppercase mb-2">
+                    <span id="loaderStatusText" class="text-amber-300">Lade Los Santos 3D Engine &amp; Stadt...</span>
+                    <span id="loaderPercentText" class="text-white tabular-nums">0%</span>
+                </div>
+                <div class="w-full h-2.5 rounded-full bg-slate-800/90 overflow-hidden border border-slate-700">
+                    <div id="loaderBarFill" class="h-full w-0 bg-gradient-to-r from-red-600 via-amber-400 to-yellow-300 transition-all duration-150"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. SERVER MODE & ACCOUNT LOGIN -->
+    <div id="loginScreen" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-5 sm:p-7 my-auto">
+            <div class="flex items-center justify-between mb-1">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                    Los Santos Online 3D
+                </span>
+                <span class="text-xs font-bold text-emerald-400">iPhone &amp; Desktop Ready</span>
+            </div>
+
+            <h1 class="text-2xl sm:text-3xl font-black text-white mt-1">
+                Server &amp; Account <span class="text-amber-400">wählen</span>
+            </h1>
+
+            <div class="mt-4">
+                <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                    1. Server-Modus wählen
+                </label>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" id="modePublicBtn" class="p-3 rounded-xl bg-amber-400 text-slate-950 border-2 border-amber-300 text-left transition">
+                        <div class="text-xs sm:text-sm font-black">Öffentlicher Server</div>
+                        <div class="text-[11px] font-semibold opacity-85 mt-0.5">Live-Lobby mit anderen Fahrern</div>
+                    </button>
+                    <button type="button" id="modePrivateBtn" class="p-3 rounded-xl bg-slate-900/90 text-slate-200 border-2 border-slate-700 hover:border-amber-400/60 text-left transition">
+                        <div class="text-xs sm:text-sm font-black">Privater Server</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">Eigener Code oder beitreten</div>
+                    </button>
+                </div>
+
+                <div id="privateServerBox" class="hidden mt-3 p-3.5 rounded-xl bg-slate-900/95 border border-amber-400/35 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-amber-300">Privater Einladungs-Code:</span>
+                        <button type="button" id="generateCodeBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-extrabold text-white">
+                            Neuer Code
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <input
+                            id="privateCodeInput"
+                            type="text"
+                            maxlength="8"
+                            placeholder="z. B. LS-8492"
+                            class="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm font-black tracking-widest uppercase text-amber-300 focus:outline-none focus:border-amber-400"
+                        />
+                        <button type="button" id="copyCodeBtn" class="px-3 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-xs font-extrabold text-amber-200">
+                            Kopieren
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <form id="loginForm" class="mt-4 space-y-3.5">
+                <div>
+                    <label for="usernameInput" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                        2. Spielername
+                    </label>
+                    <input
+                        id="usernameInput"
+                        type="text"
+                        required
+                        maxlength="22"
+                        placeholder="z. B. PhantomShark"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                </div>
+
+                <div>
+                    <label for="passwordInput" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                        3. Passwort
+                    </label>
+                    <input
+                        id="passwordInput"
+                        type="password"
+                        required
+                        maxlength="32"
+                        placeholder="••••••••"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                </div>
+
+                <div id="loginError" class="hidden text-xs font-semibold text-rose-400 bg-rose-950/60 border border-rose-500/30 rounded-xl px-3 py-2"></div>
+
+                <button
+                    type="submit"
+                    class="w-full py-3.5 px-5 rounded-xl font-black text-sm uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 text-slate-950 hover:brightness-110 active:scale-[0.99] transition shadow-lg shadow-amber-500/20"
+                >
+                    Weiter zur Charakterwahl
+                </button>
+            </form>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <span>Startpaket: <strong class="text-emerald-400">25.000 €</strong> + GT3 RS + Huracán</span>
+                <button type="button" id="quickDemoBtn" class="text-amber-300 hover:text-amber-200 font-bold underline">
+                    Schnell-Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. CHARACTER SELECTION -->
+    <div id="charSelectScreen" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+        <div class="glass-panel w-full max-w-3xl rounded-2xl p-5 sm:p-7 my-auto">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
+                <div>
+                    <p class="text-[11px] font-black uppercase tracking-widest text-amber-400">Charakterauswahl</p>
+                    <h2 class="text-2xl sm:text-3xl font-black text-white">Wähle deinen 3D-Charakter</h2>
+                </div>
+                <span id="charServerBadge" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-amber-300 border border-slate-700">
+                    Öffentlicher Server
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                <button type="button" data-char="male" class="char-card text-left p-4 sm:p-5 rounded-2xl bg-slate-900/85 border-2 border-amber-400 transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase bg-teal-500/20 text-teal-300 border border-teal-400/30">
+                                Männlich • 2013
+                            </span>
+                            <span class="char-status text-xs font-black text-amber-300">Ausgewählt</span>
+                        </div>
+                        <h3 class="text-lg sm:text-xl font-black text-white">Franklin-Look (2013)</h3>
+                        <p class="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                            Kurzer Buzzcut, schieferblaues Kurzarm-Hemd mit Brusttaschen über weißem Langarmshirt und dunklen Jeans.
+                        </p>
+                    </div>
+                    <div class="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>3D-Charakter</span>
+                        <span class="text-emerald-400 font-bold">Bereit</span>
+                    </div>
+                </button>
+
+                <button type="button" data-char="female" class="char-card text-left p-4 sm:p-5 rounded-2xl bg-slate-900/85 border-2 border-slate-700/80 transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase bg-rose-500/20 text-rose-300 border border-rose-400/30">
+                                Weiblich • Biker
+                            </span>
+                            <span class="char-status text-xs font-bold text-slate-400">Wählbar</span>
+                        </div>
+                        <h3 class="text-lg sm:text-xl font-black text-white">Lucia-Look</h3>
+                        <p class="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                            Hochgebundenes dunkles Haar, anthrazitfarbene Biker-Lederjacke mit Reißverschlüssen, Goldanhänger und dunkler Hose.
+                        </p>
+                    </div>
+                    <div class="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>3D-Charakter</span>
+                        <span class="text-emerald-400 font-bold">Bereit</span>
+                    </div>
+                </button>
+            </div>
+
+            <button
+                type="button"
+                id="spawnWorldBtn"
+                class="w-full py-4 px-6 rounded-xl font-black text-sm sm:text-base uppercase tracking-wider bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 hover:brightness-110 active:scale-[0.99] transition shadow-lg shadow-emerald-500/20"
+            >
+                In Los Santos 3D spawnen
+            </button>
+        </div>
+    </div>
+
+    <!-- 4. IN-GAME HUD -->
+    <div id="hudOverlay" class="hidden fixed inset-0 z-20 pointer-events-none">
+        <div class="fixed top-3 left-3 z-30 flex flex-col gap-2 pointer-events-auto">
+            <div class="flex items-center gap-2">
+                <button
+                    type="button"
+                    id="toggleChatBtn"
+                    aria-label="Chat ein-/ausblenden"
+                    class="touch-btn w-11 h-11 rounded-2xl glass-panel flex items-center justify-center text-white hover:border-amber-400/60 relative"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                </button>
+
+                <button
+                    type="button"
+                    id="openAdminBtn"
+                    aria-label="Admin-Panel öffnen"
+                    class="touch-btn h-11 px-3.5 rounded-2xl glass-panel flex items-center gap-1.5 text-amber-300 font-black text-xs hover:border-amber-400/60"
+                >
+                    <span>Admin</span>
+                </button>
+
+                <div class="glass-panel h-11 px-3 rounded-2xl flex items-center gap-2 text-[11px] font-extrabold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="hudServerLabel" class="text-slate-200">Öffentlich</span>
+                </div>
+            </div>
+
+            <div id="chatDrawer" class="hidden glass-panel w-[275px] sm:w-[330px] rounded-2xl p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-[11px] font-black uppercase tracking-wider text-amber-300">Server-Chat [T]</span>
+                    <button type="button" id="closeChatBtn" class="text-[11px] font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800/80">
+                        Ausblenden
+                    </button>
+                </div>
+                <div id="chatMessages" class="h-28 overflow-y-auto space-y-1 pr-1 text-xs leading-snug">
+                    <div class="text-slate-400"><span class="text-amber-400 font-bold">[Server]</span> Verbunden mit Los Santos Online.</div>
+                </div>
+                <form id="chatForm" class="mt-2 flex gap-1.5">
+                    <input
+                        id="chatInput"
+                        type="text"
+                        maxlength="180"
+                        placeholder="Nachricht schreiben..."
+                        class="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                    <button type="submit" class="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs">
+                        OK
+                    </button>
+                </form>
+            </div>
+
+            <div id="objectiveBanner" class="hidden glass-panel rounded-2xl px-3.5 py-2.5 border-l-4 border-l-amber-400 max-w-[300px]">
+                <div id="objectiveTitle" class="text-xs font-black uppercase tracking-wider text-amber-300">Heist aktiv</div>
+                <div id="objectiveDesc" class="text-[11px] text-slate-200 mt-0.5">Folge der Markierung.</div>
+            </div>
+        </div>
+
+        <div class="fixed top-3 right-3 z-20 flex flex-col items-end gap-2 pointer-events-auto">
+            <div class="flex items-center gap-2.5">
+                <div class="glass-panel rounded-2xl px-3.5 py-2 flex items-center gap-2.5">
+                    <div class="text-right">
+                        <div class="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Kontostand</div>
+                        <div id="cashDisplay" class="text-sm sm:text-base font-black text-emerald-400 tabular-nums">25.000 €</div>
+                    </div>
+                    <button
+                        type="button"
+                        id="manualSaveBtn"
+                        class="touch-btn px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600/70 text-[11px] font-extrabold text-slate-100"
+                    >
+                        Save
+                    </button>
+                </div>
+
+                <div class="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-[3px] border-slate-200/85 shadow-2xl bg-slate-900">
+                    <canvas id="minimapCanvas" class="w-full h-full block"></canvas>
+                    <span class="pointer-events-none absolute top-1 left-1/2 -translate-x-1/2 text-[9px] font-black text-white drop-shadow">N</span>
+                </div>
+            </div>
+
+            <div id="wantedContainer" class="hidden flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-950/80 border border-amber-400/35">
+                <span class="star-icon" data-star="1">★</span>
+                <span class="star-icon" data-star="2">★</span>
+                <span class="star-icon" data-star="3">★</span>
+                <span class="star-icon" data-star="4">★</span>
+                <span class="star-icon" data-star="5">★</span>
+            </div>
+
+            <div class="glass-panel rounded-xl px-3 py-1.5 text-right text-[11px]">
+                <div id="zoneLabel" class="font-black text-amber-300 uppercase tracking-wider">Los Santos Zentrum</div>
+                <div id="speedLabel" class="text-slate-200 font-bold tabular-nums">0 km/h • Zu Fuß</div>
+            </div>
+        </div>
+
+        <button
+            type="button"
+            id="interactPrompt"
+            class="hidden fixed bottom-44 sm:bottom-36 left-1/2 -translate-x-1/2 z-30 pointer-events-auto touch-btn glass-panel rounded-2xl px-5 py-3 border-2 border-amber-400 text-xs sm:text-sm font-black text-amber-300 shadow-2xl"
+        >
+            Interagieren
+        </button>
+
+        <!-- Joystick -->
+        <div id="joystickZone" class="touch-pad fixed bottom-5 left-5 z-30 pointer-events-auto w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-slate-900/45 border-2 border-white/25 backdrop-blur-sm flex items-center justify-center">
+            <div id="joystickKnob" class="w-14 h-14 rounded-full bg-white/30 border-2 border-white/75 shadow-lg pointer-events-none transition-transform duration-75"></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="fixed bottom-5 right-5 z-30 pointer-events-auto flex flex-col items-end gap-2.5">
+            <div class="flex items-center gap-2.5">
+                <button
+                    type="button"
+                    id="touchEnterBtn"
+                    class="touch-btn w-14 h-14 rounded-2xl glass-panel border border-amber-400/50 flex flex-col items-center justify-center text-amber-300 font-black text-[10px]"
+                >
+                    <span class="text-base leading-none">🚗</span>
+                    <span class="mt-0.5">Einstieg</span>
+                </button>
+
+                <button
+                    type="button"
+                    id="touchSprintBtn"
+                    class="touch-btn w-14 h-14 rounded-2xl glass-panel border border-sky-400/50 flex flex-col items-center justify-center text-sky-300 font-black text-[10px]"
+                >
+                    <span class="text-base leading-none">⚡</span>
+                    <span class="mt-0.5">Sprint/Up</span>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2.5">
+                <button
+                    type="button"
+                    id="touchBrakeBtn"
+                    class="touch-btn w-16 h-16 rounded-2xl bg-rose-950/75 border-2 border-rose-400/60 backdrop-blur-md flex flex-col items-center justify-center text-rose-200 font-black text-xs shadow-lg"
+                >
+                    <span>BREMSE</span>
+                    <span class="text-[9px] font-semibold opacity-80">Rückwärts</span>
+                </button>
+
+                <button
+                    type="button"
+                    id="touchGasBtn"
+                    class="touch-btn w-16 h-16 rounded-2xl bg-emerald-950/80 border-2 border-emerald-400/70 backdrop-blur-md flex flex-col items-center justify-center text-emerald-200 font-black text-xs shadow-lg"
+                >
+                    <span>GAS</span>
+                    <span class="text-[9px] font-semibold opacity-80">Vorwärts</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastBox" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-panel rounded-2xl px-4 py-2.5 border border-amber-400/60 text-xs sm:text-sm font-bold text-white shadow-2xl max-w-sm text-center pointer-events-none">
+        <span id="toastText"></span>
+    </div>
+
+    <!-- ADMIN MODAL -->
+    <div id="adminModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-amber-400">Server &amp; Fahrzeuge</span>
+                    <h3 class="text-xl font-black text-white">Admin-Panel</h3>
+                </div>
+                <button type="button" id="closeAdminBtn" class="touch-btn px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-black text-slate-200">
+                    Schließen
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <button type="button" id="toggleFlyBtn" class="touch-btn p-3 rounded-xl bg-slate-900 border border-slate-700 text-left">
+                    <div class="text-xs font-black text-white">Fly-Mode</div>
+                    <div id="flyStatusText" class="text-[11px] text-slate-400 mt-0.5">Aus</div>
+                </button>
+
+                <button type="button" id="toggleGodBtn" class="touch-btn p-3 rounded-xl bg-slate-900 border border-slate-700 text-left">
+                    <div class="text-xs font-black text-white">God-Mode</div>
+                    <div id="godStatusText" class="text-[11px] text-slate-400 mt-0.5">Aus</div>
+                </button>
+
+                <button type="button" id="addMoneyBtn" class="touch-btn p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-left">
+                    <div class="text-xs font-black text-emerald-300">+100.000 €</div>
+                    <div class="text-[11px] text-emerald-200/75 mt-0.5">Tuning-Geld gutschreiben</div>
+                </button>
+
+                <button type="button" id="toggleWeatherBtn" class="touch-btn p-3 rounded-xl bg-sky-950/60 border border-sky-500/40 text-left">
+                    <div class="text-xs font-black text-sky-300">Wetter wechseln</div>
+                    <div id="weatherStatusText" class="text-[11px] text-sky-200/75 mt-0.5">Regen ↔ Küsten-Tag</div>
+                </button>
+
+                <button type="button" id="cyclePaintBtn" class="touch-btn p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 text-left">
+                    <div class="text-xs font-black text-amber-300">Lackierung wechseln</div>
+                    <div id="paintStatusText" class="text-[11px] text-amber-200/75 mt-0.5">Satin-Schwarz / Champagner</div>
+                </button>
+
+                <button type="button" id="toggleTurboBtn" class="touch-btn p-3 rounded-xl bg-purple-950/50 border border-purple-500/40 text-left">
+                    <div class="text-xs font-black text-purple-300">Twin-Turbo</div>
+                    <div id="turboStatusText" class="text-[11px] text-purple-200/75 mt-0.5">Aktiv (Max Boost)</div>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+                <button type="button" id="summonPorscheBtn" class="touch-btn py-2.5 px-3 rounded-xl bg-amber-400 text-slate-950 text-xs font-black">
+                    Porsche 911 GT3 RS rufen
+                </button>
+                <button type="button" id="summonLamboBtn" class="touch-btn py-2.5 px-3 rounded-xl bg-orange-500 text-slate-950 text-xs font-black">
+                    Lamborghini Huracán rufen
+                </button>
+            </div>
+
+            <button type="button" id="resetVehiclePosBtn" class="touch-btn w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-black text-white">
+                Fahrzeug auf Straße zurücksetzen [R]
+            </button>
+
+            <div class="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                <span class="text-xs font-bold text-slate-300">Fahndung:</span>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" data-wanted="0" class="wanted-set touch-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-xs font-black">0★</button>
+                    <button type="button" data-wanted="2" class="wanted-set touch-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-xs font-black">2★</button>
+                    <button type="button" data-wanted="3" class="wanted-set touch-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-xs font-black">3★</button>
+                    <button type="button" data-wanted="5" class="wanted-set touch-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-xs font-black">5★</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAZE TOWER HEIST MODAL -->
+    <div id="mazeHeistModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-xl rounded-2xl p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-amber-400">Großüberfall • +250.000 €</span>
+                    <h3 class="text-xl font-black text-white">Maze Tower Bank-Heist</h3>
+                </div>
+                <button type="button" id="closeMazeModalBtn" class="touch-btn px-3 py-1.5 rounded-xl bg-slate-800 text-xs font-bold">
+                    Abbrechen
+                </button>
+            </div>
+
+            <div id="mazeCrewStep" class="space-y-4">
+                <p class="text-xs sm:text-sm text-slate-300">
+                    Wähle deine Crew (<strong class="text-amber-300">2 bis 5 Spieler</strong>), hacke danach die Kameras und schalte die Wachen aus.
+                </p>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Crew-Größe: <span id="crewSizeValue" class="text-amber-300 font-black">3 Spieler</span>
+                    </label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" data-crew="2" class="crew-btn touch-btn py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-black">2 Crew</button>
+                        <button type="button" data-crew="3" class="crew-btn touch-btn py-2.5 rounded-xl bg-amber-400 text-slate-950 border border-amber-300 text-xs font-black">3 Crew</button>
+                        <button type="button" data-crew="4" class="crew-btn touch-btn py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-black">4 Crew</button>
+                        <button type="button" data-crew="5" class="crew-btn touch-btn py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-black">5 Crew</button>
+                    </div>
+                </div>
+                <button type="button" id="startHackTerminalBtn" class="touch-btn w-full py-3.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider">
+                    Hacker-Terminal starten
+                </button>
+            </div>
+
+            <div id="mazeHackStep" class="hidden space-y-3">
+                <div class="bg-slate-950 rounded-xl p-4 border border-emerald-500/40 font-mono">
+                    <div class="flex items-center justify-between text-xs text-emerald-400 mb-2">
+                        <span>MAZE_SEC_OS // KAMERA-BYPASS</span>
+                        <span id="hackProgressText">0 / 4 Kameras</span>
+                    </div>
+                    <p class="text-xs text-slate-300 font-sans mb-3">
+                        Tippe auf die <strong class="text-rose-400">AKTIVEN (roten) Kameras</strong>!
+                    </p>
+                    <div id="cameraGrid" class="grid grid-cols-2 gap-2.5"></div>
+                </div>
+            </div>
+
+            <div id="mazeTakedownStep" class="hidden space-y-3">
+                <div class="bg-slate-900/90 rounded-xl p-4 border border-slate-700 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black uppercase tracking-wider text-amber-300">Wachen ausschalten</span>
+                        <span id="guardsLeftText" class="text-xs font-bold text-rose-400">3 Wachen aktiv</span>
+                    </div>
+                    <div id="guardButtons" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+                </div>
+
+                <div id="panicCutsceneBox" class="hidden rounded-xl p-4 bg-rose-950/85 border border-rose-500/60 space-y-2">
+                    <div class="text-xs font-black uppercase tracking-widest text-rose-300 animate-pulse">
+                        CUTSCENE • PANIKKNOPF AUSGELÖST!
+                    </div>
+                    <p class="text-xs text-rose-100 leading-relaxed">
+                        Der stille Alarm wurde ausgelöst! Schnapp dir die Beute und entkomme der Polizei!
+                    </p>
+                    <button type="button" id="finishCutsceneEscapeBtn" class="touch-btn mt-2 w-full py-3 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider">
+                        Tresor geplündert — Jetzt entkommen!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            const comicLoader = document.getElementById('comicLoader');
+            const loaderBarFill = document.getElementById('loaderBarFill');
+            const loaderPercentText = document.getElementById('loaderPercentText');
+            const loaderStatusText = document.getElementById('loaderStatusText');
+            const loginScreen = document.getElementById('loginScreen');
+
+            const loadSteps = [
+                { pct: 25, text: 'Initialisiere 3D-Engine & Fahrphysik...' },
+                { pct: 55, text: 'Generiere Stadtblöcke, Fassaden & Straßen...' },
+                { pct: 80, text: 'Baue Maze Tower, Flughafen & Fahrzeuge...' },
+                { pct: 100, text: 'Los Santos Online 3D bereit!' }
+            ];
+
+            let loadProgress = 0;
+            const loadTimer = setInterval(() => {
+                loadProgress += 5;
+                if (loadProgress > 100) loadProgress = 100;
+                loaderBarFill.style.width = loadProgress + '%';
+                loaderPercentText.textContent = loadProgress + '%';
+                const step = loadSteps.find((s) => loadProgress <= s.pct) || loadSteps[loadSteps.length - 1];
+                loaderStatusText.textContent = step.text;
+
+                if (loadProgress >= 100) {
+                    clearInterval(loadTimer);
+                    setTimeout(() => {
+                        comicLoader.classList.add('zoom-out');
+                        loginScreen.classList.remove('hidden');
+                        setTimeout(() => { comicLoader.style.display = 'none'; }, 800);
+                    }, 280);
+                }
+            }, 55);
+
+            const STORAGE_KEY = 'ls_online_3d_accounts_v4';
+            let accountsDB = {};
+            try {
+                accountsDB = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            } catch (err) {
+                accountsDB = {};
+            }
+
+            const gameState = {
+                username: 'Gast',
+                serverMode: 'public',
+                roomCode: 'PUBLIC-01',
+                gender: 'male',
+                cash: 25000,
+                hasGoldenJet: false,
+                paintIndex: 0,
+                twinTurbo: true,
+                godMode: false,
+                flyMode: false,
+                rainWeather: true,
+                wantedLevel: 0,
+                wantedDecayTimer: 0,
+                inVehicle: false,
+                vehicleType: 'none',
+                heistActive: null,
+                heistReward: 0,
+                heistEscapeTimer: 0
+            };
+
+            const paintPresets = [
+                { name: 'Satin-Schwarz / Champagner', body: 0x15171c, accent: 0xd9b36c, rough: 0.34, metal: 0.58 },
+                { name: 'Tiefschwarz / Gold-Chrome', body: 0x090b10, accent: 0xfacc15, rough: 0.22, metal: 0.85 },
+                { name: 'Arancio Orange / Carbon', body: 0xea580c, accent: 0x18181b, rough: 0.24, metal: 0.72 }
+            ];
+
+            let toastTimeout = null;
+            function showToast(msg, duration = 2800) {
+                const box = document.getElementById('toastBox');
+                const txt = document.getElementById('toastText');
+                if (!box || !txt) return;
+                txt.textContent = msg;
+                box.classList.remove('hidden');
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => box.classList.add('hidden'), duration);
+            }
+
+            function formatMoney(val) {
+                return Math.max(0, Math.floor(val)).toLocaleString('de-DE') + ' €';
+            }
+
+            function updateCashUI() {
+                document.getElementById('cashDisplay').textContent = formatMoney(gameState.cash);
+            }
+
+            function saveAccountToStorage(showFeedback = false) {
+                if (!gameState.username || gameState.username === 'Gast') return;
+                accountsDB[gameState.username] = {
+                    ...(accountsDB[gameState.username] || {}),
+                    username: gameState.username,
+                    gender: gameState.gender,
+                    cash: Math.floor(gameState.cash),
+                    hasGoldenJet: Boolean(gameState.hasGoldenJet),
+                    paintIndex: gameState.paintIndex,
+                    twinTurbo: Boolean(gameState.twinTurbo),
+                    rainWeather: Boolean(gameState.rainWeather),
+                    lastSaved: new Date().toISOString()
+                };
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(accountsDB));
+                    if (showFeedback) showToast('Spielstand gespeichert!');
+                } catch (err) {
+                    console.warn('Save failed:', err);
+                }
+            }
+
+            setInterval(() => {
+                if (!document.getElementById('hudOverlay').classList.contains('hidden')) {
+                    saveAccountToStorage(true);
+                }
+            }, 600000);
+
+            document.getElementById('manualSaveBtn').addEventListener('click', () => saveAccountToStorage(true));
+
+            // SERVER MODE & LOGIN
+            const modePublicBtn = document.getElementById('modePublicBtn');
+            const modePrivateBtn = document.getElementById('modePrivateBtn');
+            const privateServerBox = document.getElementById('privateServerBox');
+            const privateCodeInput = document.getElementById('privateCodeInput');
+
+            function generateInviteCode() {
+                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                let code = 'LS-';
+                for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+                privateCodeInput.value = code;
+                gameState.roomCode = code;
+            }
+            generateInviteCode();
+
+            modePublicBtn.addEventListener('click', () => {
+                gameState.serverMode = 'public';
+                gameState.roomCode = 'PUBLIC-01';
+                modePublicBtn.className = 'p-3 rounded-xl bg-amber-400 text-slate-950 border-2 border-amber-300 text-left transition';
+                modePrivateBtn.className = 'p-3 rounded-xl bg-slate-900/90 text-slate-200 border-2 border-slate-700 hover:border-amber-400/60 text-left transition';
+                privateServerBox.classList.add('hidden');
+            });
+
+            modePrivateBtn.addEventListener('click', () => {
+                gameState.serverMode = 'private';
+                if (!privateCodeInput.value.trim()) generateInviteCode();
+                gameState.roomCode = privateCodeInput.value.trim().toUpperCase();
+                modePrivateBtn.className = 'p-3 rounded-xl bg-amber-400 text-slate-950 border-2 border-amber-300 text-left transition';
+                modePublicBtn.className = 'p-3 rounded-xl bg-slate-900/90 text-slate-200 border-2 border-slate-700 hover:border-amber-400/60 text-left transition';
+                privateServerBox.classList.remove('hidden');
+            });
+
+            document.getElementById('generateCodeBtn').addEventListener('click', () => {
+                generateInviteCode();
+                showToast(`Neuer Code: ${privateCodeInput.value}`);
+            });
+
+            document.getElementById('copyCodeBtn').addEventListener('click', async () => {
+                const code = privateCodeInput.value.trim().toUpperCase();
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(code);
+                    }
+                    showToast(`Code "${code}" kopiert!`);
+                } catch (err) {
+                    showToast(`Code: ${code}`);
+                }
+            });
+
+            document.getElementById('quickDemoBtn').addEventListener('click', () => {
+                document.getElementById('usernameInput').value = 'PhantomShark';
+                document.getElementById('passwordInput').value = 'LS2026!';
+            });
+
+            const charSelectScreen = document.getElementById('charSelectScreen');
+            const hudOverlay = document.getElementById('hudOverlay');
+
+            document.getElementById('loginForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const u = document.getElementById('usernameInput').value.trim();
+                const p = document.getElementById('passwordInput').value;
+                const errBox = document.getElementById('loginError');
+
+                if (!u || p.length < 3) {
+                    errBox.textContent = 'Bitte Spielernamen und Passwort (mind. 3 Zeichen) eingeben.';
+                    errBox.classList.remove('hidden');
+                    return;
+                }
+
+                if (gameState.serverMode === 'private') {
+                    const code = privateCodeInput.value.trim().toUpperCase();
+                    if (code.length < 4) {
+                        errBox.textContent = 'Bitte einen gültigen privaten Server-Code eingeben.';
+                        errBox.classList.remove('hidden');
+                        return;
+                    }
+                    gameState.roomCode = code;
+                }
+
+                const existing = accountsDB[u];
+                const hash = btoa(unescape(encodeURIComponent(p)));
+                if (existing && existing.passwordHash && existing.passwordHash !== hash) {
+                    errBox.textContent = 'Falsches Passwort für diesen Spielernamen.';
+                    errBox.classList.remove('hidden');
+                    return;
+                }
+
+                errBox.classList.add('hidden');
+                gameState.username = u;
+                if (existing) {
+                    gameState.gender = existing.gender || 'male';
+                    gameState.cash = typeof existing.cash === 'number' ? existing.cash : 25000;
+                    gameState.hasGoldenJet = Boolean(existing.hasGoldenJet);
+                    gameState.paintIndex = existing.paintIndex || 0;
+                    gameState.twinTurbo = existing.twinTurbo !== undefined ? existing.twinTurbo : true;
+                    gameState.rainWeather = existing.rainWeather !== undefined ? existing.rainWeather : true;
+                } else {
+                    accountsDB[u] = { username: u, passwordHash: hash, cash: 25000, gender: 'male' };
+                }
+
+                updateCashUI();
+                document.getElementById('charServerBadge').textContent = gameState.serverMode === 'public'
+                    ? 'Öffentlicher Server (Live)'
+                    : `Privater Server • ${gameState.roomCode}`;
+                document.getElementById('hudServerLabel').textContent = gameState.serverMode === 'public'
+                    ? 'Öffentlich'
+                    : `Privat: ${gameState.roomCode}`;
+
+                loginScreen.classList.add('hidden');
+                charSelectScreen.classList.remove('hidden');
+            });
+
+            document.querySelectorAll('.char-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    gameState.gender = card.getAttribute('data-char') === 'female' ? 'female' : 'male';
+                    document.querySelectorAll('.char-card').forEach((c) => {
+                        const isSel = c.getAttribute('data-char') === gameState.gender;
+                        c.classList.toggle('border-amber-400', isSel && gameState.gender === 'male');
+                        c.classList.toggle('border-rose-400', isSel && gameState.gender === 'female');
+                        c.classList.toggle('border-slate-700/80', !isSel);
+                        const st = c.querySelector('.char-status');
+                        if (st) {
+                            st.textContent = isSel ? 'Ausgewählt' : 'Wählbar';
+                            st.className = isSel ? 'char-status text-xs font-black text-amber-300' : 'char-status text-xs font-bold text-slate-400';
+                        }
+                    });
+                    rebuildActiveCharacter();
+                });
+            });
+
+            document.getElementById('spawnWorldBtn').addEventListener('click', () => {
+                rebuildActiveCharacter();
+                applyWeatherMode(gameState.rainWeather);
+                applyVehiclePaint(gameState.paintIndex);
+                syncOnlineLobbyPlayers();
+                saveAccountToStorage(false);
+                charSelectScreen.classList.add('hidden');
+                hudOverlay.classList.remove('hidden');
+                placePlayerAtSpawn();
+                showToast(`Willkommen ${gameState.username}! Die Stadt ist bereit.`);
+            });
+
+            // THREE.JS SCENE & LIGHTING
+            const canvas = document.getElementById('gameCanvas');
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.15;
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x5a6573);
+            scene.fog = new THREE.FogExp2(0x5a6573, 0.0012);
+
+            const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.35, 2600);
+
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            function buildEnvMap(isRain) {
+                const envScene = new THREE.Scene();
+                envScene.background = new THREE.Color(isRain ? 0x64748b : 0x7dd3fc);
+                const dome = new THREE.Mesh(
+                    new THREE.SphereGeometry(24, 16, 16),
+                    new THREE.MeshBasicMaterial({ color: isRain ? 0x475569 : 0x2563eb, side: THREE.BackSide })
+                );
+                envScene.add(dome);
+                return pmremGenerator.fromScene(envScene, 0.04).texture;
+            }
+            scene.environment = buildEnvMap(true);
+
+            const hemiLight = new THREE.HemisphereLight(0xb0c4de, 0x1e293b, 1.08);
+            scene.add(hemiLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff5dc, 1.55);
+            sunLight.position.set(190, 270, 150);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            const dShadow = 280;
+            sunLight.shadow.camera.left = -dShadow;
+            sunLight.shadow.camera.right = dShadow;
+            sunLight.shadow.camera.top = dShadow;
+            sunLight.shadow.camera.bottom = -dShadow;
+            sunLight.shadow.camera.near = 20;
+            sunLight.shadow.camera.far = 750;
+            sunLight.shadow.bias = -0.0005;
+            scene.add(sunLight);
+
+            function createSkyTexture(isRain) {
+                const c = document.createElement('canvas');
+                c.width = 1024;
+                c.height = 512;
+                const ctx = c.getContext('2d');
+                const grad = ctx.createLinearGradient(0, 0, 0, 512);
+                if (isRain) {
+                    grad.addColorStop(0.0, '#3b434f');
+                    grad.addColorStop(0.55, '#606b79');
+                    grad.addColorStop(1.0, '#84909e');
+                } else {
+                    grad.addColorStop(0.0, '#1d6fd8');
+                    grad.addColorStop(0.58, '#66b8f2');
+                    grad.addColorStop(1.0, '#dff3ff');
+                }
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 1024, 512);
+
+                for (let i = 0; i < (isRain ? 34 : 22); i++) {
+                    const cx = ((i * 197) % 980) + 20;
+                    const cy = 60 + ((i * 73) % 240);
+                    const rx = 48 + (i % 4) * 28;
+                    const ry = 14 + (i % 3) * 8;
+                    ctx.fillStyle = isRain ? 'rgba(203, 213, 225, 0.16)' : 'rgba(255, 255, 255, 0.44)';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                return tex;
+            }
+
+            const skyDome = new THREE.Mesh(
+                new THREE.SphereGeometry(1750, 32, 24),
+                new THREE.MeshBasicMaterial({ map: createSkyTexture(true), side: THREE.BackSide, fog: false })
+            );
+            scene.add(skyDome);
+
+            const rainCount = 1600;
+            const rainPositions = new Float32Array(rainCount * 6);
+            for (let i = 0; i < rainCount; i++) {
+                const x = (Math.random() - 0.5) * 260;
+                const y = Math.random() * 90;
+                const z = (Math.random() - 0.5) * 260;
+                rainPositions[i * 6 + 0] = x;
+                rainPositions[i * 6 + 1] = y;
+                rainPositions[i * 6 + 2] = z;
+                rainPositions[i * 6 + 3] = x - 0.3;
+                rainPositions[i * 6 + 4] = y - 2.4;
+                rainPositions[i * 6 + 5] = z + 0.12;
+            }
+            const rainGeo = new THREE.BufferGeometry();
+            rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+            const rainLines = new THREE.LineSegments(
+                rainGeo,
+                new THREE.LineBasicMaterial({ color: 0xdbeafe, transparent: true, opacity: 0.35 })
+            );
+            scene.add(rainLines);
+
+            // WORLD, ENHANCED CITY & COLLIDERS
+            const worldGroup = new THREE.Group();
+            scene.add(worldGroup);
+            const buildingColliders = [];
+
+            function registerBuildingCollider(x, z, w, d) {
+                buildingColliders.push({
+                    minX: x - w / 2 - 1.35,
+                    maxX: x + w / 2 + 1.35,
+                    minZ: z - d / 2 - 1.35,
+                    maxZ: z + d / 2 + 1.35
+                });
+            }
+
+            function createAsphaltTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512;
+                c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#1b1f26';
+                ctx.fillRect(0, 0, 512, 512);
+
+                for (let i = 0; i < 5000; i++) {
+                    const v = 22 + ((i * 37) % 30);
+                    ctx.fillStyle = `rgb(${v},${v},${v + 4})`;
+                    ctx.fillRect((i * 97) % 512, (i * 151) % 512, 2, 2);
+                }
+
+                ctx.fillStyle = 'rgba(241, 245, 249, 0.78)';
+                ctx.fillRect(16, 0, 7, 512);
+                ctx.fillRect(489, 0, 7, 512);
+
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.88)';
+                ctx.fillRect(250, 12, 5, 110);
+                ctx.fillRect(250, 148, 5, 110);
+                ctx.fillRect(250, 284, 5, 110);
+                ctx.fillRect(250, 418, 5, 82);
+
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, 28);
+                tex.anisotropy = 4;
+                tex.needsUpdate = true;
+                return tex;
+            }
+
+            function createBuildingTexture(facadeHex, windowLitHex, accentHex) {
+                const c = document.createElement('canvas');
+                c.width = 512;
+                c.height = 1024;
+                const ctx = c.getContext('2d');
+
+                ctx.fillStyle = facadeHex;
+                ctx.fillRect(0, 0, 512, 1024);
+
+                ctx.fillStyle = accentHex;
+                for (let x = 0; x <= 512; x += 64) {
+                    ctx.fillRect(x, 0, 8, 1024);
+                }
+
+                const cols = 8;
+                const rows = 28;
+                const padX = 14;
+                const padY = 8;
+                const cellW = 512 / cols;
+                const cellH = 1024 / rows;
+
+                for (let r = 0; r < rows; r++) {
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
+                    ctx.fillRect(0, r * cellH, 512, 3);
+
+                    for (let col = 0; col < cols; col++) {
+                        const wx = col * cellW + padX;
+                        const wy = r * cellH + padY;
+                        const ww = cellW - padX * 2;
+                        const wh = cellH - padY * 2;
+                        const seed = (r * 13 + col * 7) % 11;
+
+                        ctx.fillStyle = seed === 0 || seed === 5 || seed === 9 ? windowLitHex : '#0d1929';
+                        ctx.fillRect(wx, wy, ww, wh);
+
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+                        ctx.fillRect(wx + 2, wy + 2, 5, Math.max(4, wh - 4));
+
+                        ctx.strokeStyle = '#111827';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(wx, wy, ww, wh);
+                    }
+                }
+
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.anisotropy = 4;
+                tex.needsUpdate = true;
+                return tex;
+            }
+
+            const oceanMat = new THREE.MeshStandardMaterial({ color: 0x1a4e73, roughness: 0.16, metalness: 0.76 });
+            const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600), oceanMat);
+            oceanMesh.rotation.x = -Math.PI / 2;
+            oceanMesh.position.y = -0.35;
+            oceanMesh.receiveShadow = true;
+            worldGroup.add(oceanMesh);
+
+            const roadMat = new THREE.MeshStandardMaterial({
+                map: createAsphaltTexture(),
+                color: 0xffffff,
+                roughness: 0.24,
+                metalness: 0.45
+            });
+            const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x8493a6, roughness: 0.65, metalness: 0.12 });
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x3b443e, roughness: 0.78, metalness: 0.08 });
+            const sandMat = new THREE.MeshStandardMaterial({ color: 0xd2be96, roughness: 0.85, metalness: 0.04 });
+            const mountainMat = new THREE.MeshStandardMaterial({ color: 0x38523a, roughness: 0.86, metalness: 0.05 });
+            const desertMat = new THREE.MeshStandardMaterial({ color: 0xc2a374, roughness: 0.85, metalness: 0.05 });
+
+            const islandBase = new THREE.Mesh(new THREE.CylinderGeometry(860, 920, 1.2, 56), groundMat);
+            islandBase.scale.set(1.12, 1, 0.92);
+            islandBase.position.set(0, -0.4, -40);
+            islandBase.receiveShadow = true;
+            worldGroup.add(islandBase);
+
+            const beachRim = new THREE.Mesh(new THREE.RingGeometry(745, 895, 56), sandMat);
+            beachRim.rotation.x = -Math.PI / 2;
+            beachRim.scale.set(1.12, 0.92, 1);
+            beachRim.position.set(0, -0.04, -40);
+            beachRim.receiveShadow = true;
+            worldGroup.add(beachRim);
+
+            [
+                { x: -260, z: -560, r: 195, h: 118 },
+                { x: -40, z: -630, r: 230, h: 148 },
+                { x: 190, z: -570, r: 185, h: 108 },
+                { x: -460, z: -360, r: 155, h: 80 }
+            ].forEach((m) => {
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(m.r, m.h, 16), mountainMat);
+                cone.position.set(m.x, m.h * 0.45, m.z);
+                cone.castShadow = true;
+                cone.receiveShadow = true;
+                worldGroup.add(cone);
+            });
+
+            const desertBasin = new THREE.Mesh(new THREE.CylinderGeometry(260, 310, 1.4, 28), desertMat);
+            desertBasin.position.set(470, 0.1, -180);
+            desertBasin.receiveShadow = true;
+            worldGroup.add(desertBasin);
+
+            // Roads, Sidewalks & Intersection Crosswalks
+            const crosswalkMat = new THREE.MeshBasicMaterial({ color: 0xf1f5f9 });
+            for (let x = -300; x <= 300; x += 100) {
+                const sw = new THREE.Mesh(new THREE.BoxGeometry(24, 0.16, 724), sidewalkMat);
+                sw.position.set(x, 0.04, 20);
+                sw.receiveShadow = true;
+                worldGroup.add(sw);
+
+                const roadNS = new THREE.Mesh(new THREE.BoxGeometry(18, 0.2, 720), roadMat);
+                roadNS.position.set(x, 0.08, 20);
+                roadNS.receiveShadow = true;
+                worldGroup.add(roadNS);
+            }
+            for (let z = -280; z <= 320; z += 100) {
+                const sw = new THREE.Mesh(new THREE.BoxGeometry(724, 0.16, 24), sidewalkMat);
+                sw.position.set(0, 0.04, z);
+                sw.receiveShadow = true;
+                worldGroup.add(sw);
+
+                const roadEW = new THREE.Mesh(new THREE.BoxGeometry(720, 0.2, 18), roadMat);
+                roadEW.position.set(0, 0.08, z);
+                roadEW.receiveShadow = true;
+                worldGroup.add(roadEW);
+
+                for (let x = -300; x <= 300; x += 100) {
+                    for (let s = -6; s <= 6; s += 4) {
+                        const stripe = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 16), crosswalkMat);
+                        stripe.rotation.x = -Math.PI / 2;
+                        stripe.position.set(x + s, 0.19, z);
+                        worldGroup.add(stripe);
+                    }
+                }
+            }
+
+            const buildingStyles = [
+                new THREE.MeshStandardMaterial({
+                    map: createBuildingTexture('#475569', '#fde68a', '#334155'),
+                    roughness: 0.28,
+                    metalness: 0.65
+                }),
+                new THREE.MeshStandardMaterial({
+                    map: createBuildingTexture('#94a3b8', '#bae6fd', '#64748b'),
+                    roughness: 0.24,
+                    metalness: 0.72
+                }),
+                new THREE.MeshStandardMaterial({
+                    map: createBuildingTexture('#6b5e53', '#ffedd5', '#4a4038'),
+                    roughness: 0.36,
+                    metalness: 0.45
+                }),
+                new THREE.MeshStandardMaterial({
+                    map: createBuildingTexture('#3b5266', '#fef08a', '#273847'),
+                    roughness: 0.26,
+                    metalness: 0.68
+                })
+            ];
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.8 });
+            const lampGlowMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+            const palmTrunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.88 });
+            const palmLeafMat = new THREE.MeshStandardMaterial({ color: 0x2e6f38, roughness: 0.72 });
+
+            function addPalmTree(x, z) {
+                const pGroup = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 11, 8), palmTrunkMat);
+                trunk.position.y = 5.5;
+                trunk.castShadow = true;
+                pGroup.add(trunk);
+                for (let k = 0; k < 6; k++) {
+                    const leaf = new THREE.Mesh(new THREE.ConeGeometry(1.05, 4.3, 4), palmLeafMat);
+                    const ang = (k / 6) * Math.PI * 2;
+                    leaf.position.set(Math.cos(ang) * 1.35, 11.1, Math.sin(ang) * 1.35);
+                    leaf.rotation.z = -Math.cos(ang) * 1.05;
+                    leaf.rotation.x = Math.sin(ang) * 1.05;
+                    pGroup.add(leaf);
+                }
+                pGroup.position.set(x, 0, z);
+                worldGroup.add(pGroup);
+            }
+
+            function addStreetLamp(x, z) {
+                const lamp = new THREE.Group();
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7.5, 8), poleMat);
+                post.position.y = 3.75;
+                post.castShadow = true;
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.9), lampGlowMat);
+                head.position.set(0, 7.55, 0.25);
+                lamp.add(post, head);
+                lamp.position.set(x, 0, z);
+                worldGroup.add(lamp);
+            }
+
+            // Rich City Blocks with Towers, Mid-Rise Buildings, Roof Units, Palms & Streetlights
+            const cityBlocks = [
+                [-150, -80], [150, -80], [-150, 120], [150, 120],
+                [-250, -180], [250, -180], [-250, 220], [250, 220],
+                [-150, -230], [150, -230], [-250, 20], [250, 20]
+            ];
+
+            cityBlocks.forEach(([bx, bz], idx) => {
+                // Keep spawn street clear around (18, 26)
+                if (Math.hypot(bx - 18, bz - 26) < 42) return;
+
+                const mainH = 44 + ((idx * 19) % 58);
+                const mainW = 42;
+                const styleMat = buildingStyles[idx % buildingStyles.length];
+                const bldg = new THREE.Mesh(
+                    new THREE.BoxGeometry(mainW, mainH, mainW),
+                    [styleMat, styleMat, roofMat, roofMat, styleMat, styleMat]
+                );
+                bldg.position.set(bx, mainH / 2, bz);
+                bldg.castShadow = true;
+                bldg.receiveShadow = true;
+                worldGroup.add(bldg);
+                registerBuildingCollider(bx, bz, mainW, mainW);
+
+                // Rooftop mechanical / helipad detail
+                const roofBox = new THREE.Mesh(new THREE.BoxGeometry(10, 3.2, 10), roofMat);
+                roofBox.position.set(bx - 6, mainH + 1.6, bz - 6);
+                worldGroup.add(roofBox);
+
+                // Secondary mid-rise annex on every second block
+                if (idx % 2 === 0) {
+                    const subH = 22 + ((idx * 11) % 24);
+                    const subX = bx + 24;
+                    const subZ = bz + 22;
+                    const subMat = buildingStyles[(idx + 1) % buildingStyles.length];
+                    const annex = new THREE.Mesh(
+                        new THREE.BoxGeometry(20, subH, 20),
+                        [subMat, subMat, roofMat, roofMat, subMat, subMat]
+                    );
+                    annex.position.set(subX, subH / 2, subZ);
+                    annex.castShadow = true;
+                    annex.receiveShadow = true;
+                    worldGroup.add(annex);
+                    registerBuildingCollider(subX, subZ, 20, 20);
+                }
+
+                addPalmTree(bx - 28, bz + 28);
+                if (idx % 2 === 1) addPalmTree(bx + 28, bz - 28);
+                addStreetLamp(bx - 36, bz);
+            });
+
+            // MAZE TOWER
+            const MAZE_POS = new THREE.Vector3(0, 0, -40);
+            const mazeTowerGroup = new THREE.Group();
+            mazeTowerGroup.position.copy(MAZE_POS);
+            worldGroup.add(mazeTowerGroup);
+            registerBuildingCollider(MAZE_POS.x, MAZE_POS.z, 54, 54);
+
+            const mazeFacadeMat = new THREE.MeshStandardMaterial({
+                map: createBuildingTexture('#e8dcc4', '#fef08a', '#cbbba0'),
+                roughness: 0.32,
+                metalness: 0.35
+            });
+            const darkStepBandMat = new THREE.MeshStandardMaterial({ color: 0x18202a, roughness: 0.2, metalness: 0.85 });
+
+            [
+                { rTop: 28, rBot: 30, h: 68, y: 34, arc: Math.PI * 1.45, rotY: 0.4 },
+                { rTop: 22, rBot: 23.5, h: 56, y: 94, arc: Math.PI * 1.4, rotY: 1.2 },
+                { rTop: 16.5, rBot: 17.5, h: 46, y: 143, arc: Math.PI * 1.35, rotY: 2.1 },
+                { rTop: 11.5, rBot: 12.2, h: 34, y: 183, arc: Math.PI * 1.3, rotY: 2.9 }
+            ].forEach((t) => {
+                const shell = new THREE.Mesh(
+                    new THREE.CylinderGeometry(t.rTop, t.rBot, t.h, 36, 1, false, 0, t.arc),
+                    mazeFacadeMat
+                );
+                shell.position.y = t.y;
+                shell.rotation.y = t.rotY;
+                shell.castShadow = true;
+                shell.receiveShadow = true;
+                mazeTowerGroup.add(shell);
+
+                const band = new THREE.Mesh(
+                    new THREE.CylinderGeometry(t.rTop + 0.35, t.rTop + 0.35, 2.2, 36, 1, true, 0, t.arc),
+                    darkStepBandMat
+                );
+                band.position.y = t.y + t.h * 0.5;
+                band.rotation.y = t.rotY;
+                mazeTowerGroup.add(band);
+            });
+
+            function createMazeCrownTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512;
+                c.height = 128;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#18202a';
+                ctx.fillRect(0, 0, 512, 128);
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '900 54px Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('MAZE', 24, 66);
+                ctx.fillStyle = '#dc2626';
+                ctx.fillRect(250, 22, 238, 84);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '900 46px Inter, sans-serif';
+                ctx.fillText('BANK', 274, 68);
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                return tex;
+            }
+
+            const crownSign = new THREE.Mesh(
+                new THREE.CylinderGeometry(12.3, 12.3, 7.5, 28, 1, true, -0.7, 1.4),
+                new THREE.MeshBasicMaterial({ map: createMazeCrownTexture(), side: THREE.DoubleSide })
+            );
+            crownSign.position.y = 204;
+            mazeTowerGroup.add(crownSign);
+
+            const mazeBeacon = new THREE.Mesh(
+                new THREE.RingGeometry(4.2, 5.4, 32),
+                new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })
+            );
+            mazeBeacon.rotation.x = -Math.PI / 2;
+            mazeBeacon.position.set(0, 0.22, 34);
+            worldGroup.add(mazeBeacon);
+
+            // COASTAL AIRPORT & GOLDEN JET
+            const AIRPORT_POS = new THREE.Vector3(-430, 0, 360);
+            const airportGroup = new THREE.Group();
+            airportGroup.position.copy(AIRPORT_POS);
+            airportGroup.rotation.y = -0.32;
+            worldGroup.add(airportGroup);
+
+            const apronBase = new THREE.Mesh(new THREE.BoxGeometry(270, 0.4, 360), sidewalkMat);
+            apronBase.position.y = 0.05;
+            apronBase.receiveShadow = true;
+            airportGroup.add(apronBase);
+
+            const runway = new THREE.Mesh(new THREE.BoxGeometry(28, 0.14, 330), roadMat);
+            runway.position.set(-75, 0.26, 0);
+            runway.receiveShadow = true;
+            airportGroup.add(runway);
+
+            const terminal = new THREE.Mesh(
+                new THREE.BoxGeometry(44, 14, 95),
+                new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.35 })
+            );
+            terminal.position.set(78, 7.2, -30);
+            terminal.castShadow = true;
+            airportGroup.add(terminal);
+
+            const towerShaft = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 5.5, 34, 12), buildingStyles[1]);
+            towerShaft.position.set(78, 17, 45);
+            airportGroup.add(towerShaft);
+
+            const towerCab = new THREE.Mesh(
+                new THREE.CylinderGeometry(7.5, 5.2, 6.5, 12),
+                new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.15, metalness: 0.85 })
+            );
+            towerCab.position.set(78, 35.5, 45);
+            airportGroup.add(towerCab);
+
+            const jetGroup = new THREE.Group();
+            jetGroup.position.set(-450, 1.8, 330);
+            jetGroup.rotation.y = -0.32;
+            scene.add(jetGroup);
+
+            const goldMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.2, metalness: 0.9 });
+            const jetFuselage = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 15, 16), goldMat);
+            jetFuselage.rotation.x = Math.PI / 2;
+            jetFuselage.castShadow = true;
+            jetGroup.add(jetFuselage);
+
+            const jetNose = new THREE.Mesh(new THREE.ConeGeometry(1.5, 4.2, 16), goldMat);
+            jetNose.rotation.x = Math.PI / 2;
+            jetNose.position.z = 9.6;
+            jetGroup.add(jetNose);
+
+            const jetWings = new THREE.Mesh(new THREE.BoxGeometry(16, 0.26, 3.8), goldMat);
+            jetWings.position.set(0, -0.2, 0.8);
+            jetWings.castShadow = true;
+            jetGroup.add(jetWings);
+
+            const jetTail = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.2, 2.4), goldMat);
+            jetTail.position.set(0, 2.0, -6.2);
+            jetGroup.add(jetTail);
+
+            // PORSCHE 911 GT3 RS
+            const porscheGroup = new THREE.Group();
+            porscheGroup.position.set(22, 0, 22);
+            scene.add(porscheGroup);
+
+            const porscheBodyMat = new THREE.MeshStandardMaterial({
+                color: paintPresets[0].body,
+                roughness: paintPresets[0].rough,
+                metalness: paintPresets[0].metal
+            });
+            const champagneMat = new THREE.MeshStandardMaterial({
+                color: paintPresets[0].accent,
+                roughness: 0.26,
+                metalness: 0.88
+            });
+            const carbonMat = new THREE.MeshStandardMaterial({ color: 0x16181d, roughness: 0.42, metalness: 0.5 });
+            const glassMat = new THREE.MeshStandardMaterial({
+                color: 0x0b1220,
+                roughness: 0.08,
+                metalness: 0.92,
+                transparent: true,
+                opacity: 0.84
+            });
+            const headlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const brakeLightMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+
+            const pLower = new THREE.Mesh(new THREE.BoxGeometry(2.08, 0.56, 4.62), porscheBodyMat);
+            pLower.position.set(0, 0.6, 0);
+            pLower.castShadow = true;
+            pLower.receiveShadow = true;
+            porscheGroup.add(pLower);
+
+            [-0.94, 0.94].forEach((hx) => {
+                const hip = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.52, 2.1), porscheBodyMat);
+                hip.position.set(hx, 0.68, -1.05);
+                hip.castShadow = true;
+                porscheGroup.add(hip);
+            });
+
+            const pCabin = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.5, 2.15), glassMat);
+            pCabin.position.set(0, 1.04, -0.18);
+            pCabin.castShadow = true;
+            porscheGroup.add(pCabin);
+
+            const pRoof = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.09, 1.8), champagneMat);
+            pRoof.position.set(0, 1.3, -0.22);
+            porscheGroup.add(pRoof);
+
+            function createGT3SideTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512;
+                c.height = 96;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#15171c';
+                ctx.fillRect(0, 0, 512, 96);
+                ctx.fillStyle = '#d9b36c';
+                ctx.fillRect(0, 14, 155, 68);
+                ctx.fillRect(380, 14, 132, 68);
+                ctx.font = 'italic 900 58px Inter, sans-serif';
+                ctx.fillStyle = '#d9b36c';
+                ctx.fillText('GT3 RS', 168, 68);
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                return tex;
+            }
+            const gt3SideMat = new THREE.MeshStandardMaterial({ map: createGT3SideTexture(), roughness: 0.3, metalness: 0.75 });
+
+            [-1.06, 1.06].forEach((sideX) => {
+                const gt3Stripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 2.35), gt3SideMat);
+                gt3Stripe.position.set(sideX, 0.56, 0.02);
+                porscheGroup.add(gt3Stripe);
+
+                for (let l = 0; l < 3; l++) {
+                    const louver = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.12), carbonMat);
+                    louver.position.set(sideX * 0.85, 0.92, 1.32 + l * 0.19);
+                    porscheGroup.add(louver);
+                }
+
+                const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.18), carbonMat);
+                mirror.position.set(sideX * 1.05, 1.0, 0.55);
+                porscheGroup.add(mirror);
+            });
+
+            const pSplitter = new THREE.Mesh(new THREE.BoxGeometry(2.14, 0.11, 0.55), carbonMat);
+            pSplitter.position.set(0, 0.34, 2.18);
+            porscheGroup.add(pSplitter);
+
+            const pRearLed = new THREE.Mesh(new THREE.BoxGeometry(1.98, 0.09, 0.08), brakeLightMat);
+            pRearLed.position.set(0, 0.84, -2.32);
+            porscheGroup.add(pRearLed);
+
+            const pDiffuser = new THREE.Mesh(new THREE.BoxGeometry(2.02, 0.25, 0.45), carbonMat);
+            pDiffuser.position.set(0, 0.4, -2.22);
+            porscheGroup.add(pDiffuser);
+
+            [-0.18, 0.18].forEach((exX) => {
+                const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.32, 14), champagneMat);
+                pipe.rotation.x = Math.PI / 2;
+                pipe.position.set(exX, 0.42, -2.38);
+                porscheGroup.add(pipe);
+            });
+
+            function createPorscheWingTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512;
+                c.height = 128;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#15171c';
+                ctx.fillRect(0, 0, 512, 128);
+                ctx.fillStyle = '#d9b36c';
+                ctx.font = '900 62px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('P O R S C H E', 256, 66);
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                return tex;
+            }
+            const porscheWingMat = new THREE.MeshStandardMaterial({ map: createPorscheWingTexture(), roughness: 0.3, metalness: 0.65 });
+
+            const pWingGroup = new THREE.Group();
+            pWingGroup.position.set(0, 1.44, -1.96);
+            porscheGroup.add(pWingGroup);
+
+            const pWingBlade = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.1, 0.52), porscheWingMat);
+            pWingBlade.rotation.x = 0.16;
+            pWingBlade.castShadow = true;
+            pWingGroup.add(pWingBlade);
+
+            [-1.13, 1.13].forEach((endX) => {
+                const endPlate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.38, 0.62), carbonMat);
+                endPlate.position.set(endX, 0.04, -0.02);
+                pWingGroup.add(endPlate);
+
+                const swanStrut = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.15), carbonMat);
+                swanStrut.position.set(endX * 0.56, -0.2, 0.08);
+                swanStrut.rotation.x = -0.25;
+                pWingGroup.add(swanStrut);
+            });
+
+            [-0.76, 0.76].forEach((hlX) => {
+                const hl = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.12, 0.08), headlightMat);
+                hl.position.set(hlX, 0.7, 2.32);
+                porscheGroup.add(hl);
+            });
+
+            const porscheWheels = [];
+            const porscheFrontSteer = [];
+            const tireMat = new THREE.MeshStandardMaterial({ color: 0x101216, roughness: 0.75, metalness: 0.15 });
+            const discMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.85 });
+
+            function addWheelToVehicle(parent, wheelsArr, steerArr, isFront, xOff, zOff, rimMat, isTurbofanRear) {
+                const steerPivot = new THREE.Group();
+                steerPivot.position.set(xOff, 0.42, zOff);
+
+                const spinGroup = new THREE.Group();
+                const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.34, 20), tireMat);
+                tire.rotation.z = Math.PI / 2;
+                tire.castShadow = true;
+                spinGroup.add(tire);
+
+                const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.35, 16), discMat);
+                disc.rotation.z = Math.PI / 2;
+                spinGroup.add(disc);
+
+                if (isTurbofanRear) {
+                    const aeroDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.36, 20), rimMat);
+                    aeroDisc.rotation.z = Math.PI / 2;
+                    spinGroup.add(aeroDisc);
+                    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.38, 12), carbonMat);
+                    cap.rotation.z = Math.PI / 2;
+                    spinGroup.add(cap);
+                } else {
+                    for (let s = 0; s < 5; s++) {
+                        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.055, 0.54), rimMat);
+                        spoke.rotation.x = (s / 5) * Math.PI;
+                        spinGroup.add(spoke);
+                    }
+                }
+
+                steerPivot.add(spinGroup);
+                parent.add(steerPivot);
+                wheelsArr.push(spinGroup);
+                if (isFront) steerArr.push(steerPivot);
+            }
+
+            addWheelToVehicle(porscheGroup, porscheWheels, porscheFrontSteer, true, -1.06, 1.44, champagneMat, false);
+            addWheelToVehicle(porscheGroup, porscheWheels, porscheFrontSteer, true, 1.06, 1.44, champagneMat, false);
+            addWheelToVehicle(porscheGroup, porscheWheels, porscheFrontSteer, false, -1.08, -1.44, champagneMat, true);
+            addWheelToVehicle(porscheGroup, porscheWheels, porscheFrontSteer, false, 1.08, -1.44, champagneMat, true);
+
+            // LAMBORGHINI HURACÁN
+            const lamboGroup = new THREE.Group();
+            lamboGroup.position.set(14, 0, 22);
+            scene.add(lamboGroup);
+
+            const lamboBodyMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.22, metalness: 0.78 });
+            const lamboWheelMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.28, metalness: 0.85 });
+
+            const lLower = new THREE.Mesh(new THREE.BoxGeometry(2.12, 0.48, 4.55), lamboBodyMat);
+            lLower.position.set(0, 0.54, 0);
+            lLower.castShadow = true;
+            lLower.receiveShadow = true;
+            lamboGroup.add(lLower);
+
+            const lHood = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.24, 1.55), lamboBodyMat);
+            lHood.position.set(0, 0.74, 1.38);
+            lHood.rotation.x = 0.14;
+            lHood.castShadow = true;
+            lamboGroup.add(lHood);
+
+            const lCabin = new THREE.Mesh(new THREE.BoxGeometry(1.76, 0.44, 1.95), glassMat);
+            lCabin.position.set(0, 0.96, 0.05);
+            lCabin.castShadow = true;
+            lamboGroup.add(lCabin);
+
+            const lRoof = new THREE.Mesh(new THREE.BoxGeometry(1.64, 0.08, 1.35), lamboBodyMat);
+            lRoof.position.set(0, 1.18, -0.05);
+            lamboGroup.add(lRoof);
+
+            const lEngineDeck = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.22, 1.35), carbonMat);
+            lEngineDeck.position.set(0, 0.84, -1.45);
+            lamboGroup.add(lEngineDeck);
+
+            [-1.07, 1.07].forEach((sx) => {
+                const intake = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.34, 0.95), carbonMat);
+                intake.position.set(sx, 0.62, -0.55);
+                lamboGroup.add(intake);
+            });
+
+            [-0.76, 0.76].forEach((hx) => {
+                const yLight = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.08), headlightMat);
+                yLight.position.set(hx, 0.64, 2.28);
+                yLight.rotation.z = hx > 0 ? -0.18 : 0.18;
+                lamboGroup.add(yLight);
+
+                const rLight = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.08), brakeLightMat);
+                rLight.position.set(hx * 0.88, 0.76, -2.28);
+                lamboGroup.add(rLight);
+            });
+
+            const lDiffuser = new THREE.Mesh(new THREE.BoxGeometry(2.04, 0.22, 0.4), carbonMat);
+            lDiffuser.position.set(0, 0.38, -2.18);
+            lamboGroup.add(lDiffuser);
+
+            const lamboWheels = [];
+            const lamboFrontSteer = [];
+            addWheelToVehicle(lamboGroup, lamboWheels, lamboFrontSteer, true, -1.06, 1.42, lamboWheelMat, false);
+            addWheelToVehicle(lamboGroup, lamboWheels, lamboFrontSteer, true, 1.06, 1.42, lamboWheelMat, false);
+            addWheelToVehicle(lamboGroup, lamboWheels, lamboFrontSteer, false, -1.08, -1.42, lamboWheelMat, false);
+            addWheelToVehicle(lamboGroup, lamboWheels, lamboFrontSteer, false, 1.08, -1.42, lamboWheelMat, false);
+
+            function applyVehiclePaint(idx) {
+                const p = paintPresets[idx % paintPresets.length];
+                gameState.paintIndex = idx % paintPresets.length;
+                porscheBodyMat.color.setHex(p.body);
+                porscheBodyMat.roughness = p.rough;
+                porscheBodyMat.metalness = p.metal;
+                champagneMat.color.setHex(p.accent);
+                const el = document.getElementById('paintStatusText');
+                if (el) el.textContent = p.name;
+            }
+
+            // CHARACTERS
+            function buildCharacterMesh(gender) {
+                const root = new THREE.Group();
+                const parts = { head: null, leftArm: null, rightArm: null, leftLeg: null, rightLeg: null };
+
+                if (gender === 'male') {
+                    const skinMat = new THREE.MeshStandardMaterial({ color: 0x5c3824, roughness: 0.62 });
+                    const shirtMat = new THREE.MeshStandardMaterial({ color: 0x386675, roughness: 0.7 });
+                    const whiteUnderMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.78 });
+                    const jeansMat = new THREE.MeshStandardMaterial({ color: 0x283445, roughness: 0.8 });
+                    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.7 });
+
+                    const headGroup = new THREE.Group();
+                    headGroup.position.set(0, 1.62, 0);
+                    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.21, 18, 18), skinMat);
+                    headMesh.castShadow = true;
+                    headGroup.add(headMesh);
+
+                    const buzzHair = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.215, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.52),
+                        new THREE.MeshStandardMaterial({ color: 0x161618, roughness: 0.88 })
+                    );
+                    buzzHair.position.y = 0.02;
+                    headGroup.add(buzzHair);
+                    root.add(headGroup);
+                    parts.head = headGroup;
+
+                    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.08, 12), whiteUnderMat);
+                    collar.position.set(0, 1.44, 0);
+                    root.add(collar);
+
+                    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.64, 0.28), shirtMat);
+                    torso.position.set(0, 1.12, 0);
+                    torso.castShadow = true;
+                    root.add(torso);
+
+                    const underHem = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.26), whiteUnderMat);
+                    underHem.position.set(0, 0.78, 0);
+                    root.add(underHem);
+
+                    [-0.13, 0.13].forEach((px) => {
+                        const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.03), shirtMat);
+                        pocket.position.set(px, 1.2, 0.15);
+                        root.add(pocket);
+                    });
+
+                    function makeFranklinArm(xOff) {
+                        const armPivot = new THREE.Group();
+                        armPivot.position.set(xOff, 1.38, 0);
+                        const shortSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.24, 0.145), shirtMat);
+                        shortSleeve.position.y = -0.1;
+                        const longWhite = new THREE.Mesh(new THREE.BoxGeometry(0.125, 0.25, 0.125), whiteUnderMat);
+                        longWhite.position.y = -0.32;
+                        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 10), skinMat);
+                        hand.position.y = -0.47;
+                        armPivot.add(shortSleeve, longWhite, hand);
+                        root.add(armPivot);
+                        return armPivot;
+                    }
+                    parts.leftArm = makeFranklinArm(-0.34);
+                    parts.rightArm = makeFranklinArm(0.34);
+
+                    function makeFranklinLeg(xOff) {
+                        const legPivot = new THREE.Group();
+                        legPivot.position.set(xOff, 0.76, 0);
+                        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.68, 0.2), jeansMat);
+                        leg.position.y = -0.34;
+                        leg.castShadow = true;
+                        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.09, 0.27), shoeMat);
+                        shoe.position.set(0, -0.71, 0.03);
+                        legPivot.add(leg, shoe);
+                        root.add(legPivot);
+                        return legPivot;
+                    }
+                    parts.leftLeg = makeFranklinLeg(-0.13);
+                    parts.rightLeg = makeFranklinLeg(0.13);
+                } else {
+                    const tanMat = new THREE.MeshStandardMaterial({ color: 0xc58b63, roughness: 0.56 });
+                    const hairMat = new THREE.MeshStandardMaterial({ color: 0x1b1310, roughness: 0.72 });
+                    const jacketMat = new THREE.MeshStandardMaterial({ color: 0x24272c, roughness: 0.42, metalness: 0.28 });
+                    const zipMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, roughness: 0.25, metalness: 0.9 });
+                    const topMat = new THREE.MeshStandardMaterial({ color: 0xf5f0e6, roughness: 0.8 });
+                    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x17191f, roughness: 0.72 });
+                    const goldPendantMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.2, metalness: 0.92 });
+
+                    const headGroup = new THREE.Group();
+                    headGroup.position.set(0, 1.56, 0);
+                    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 18), tanMat);
+                    headMesh.castShadow = true;
+                    headGroup.add(headMesh);
+
+                    const hairCrown = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.205, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.65),
+                        hairMat
+                    );
+                    hairCrown.position.y = 0.02;
+                    headGroup.add(hairCrown);
+
+                    const tiedBun = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.36, 12), hairMat);
+                    tiedBun.position.set(0, -0.04, -0.22);
+                    tiedBun.rotation.x = 0.35;
+                    headGroup.add(tiedBun);
+
+                    [-0.17, 0.17].forEach((sx) => {
+                        const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.014, 0.32, 6), hairMat);
+                        strand.position.set(sx, -0.1, 0.11);
+                        headGroup.add(strand);
+                    });
+
+                    root.add(headGroup);
+                    parts.head = headGroup;
+
+                    const topMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.22), topMat);
+                    topMesh.position.set(0, 1.12, 0);
+                    root.add(topMesh);
+
+                    [-0.14, 0.14].forEach((jx) => {
+                        const lapel = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.25), jacketMat);
+                        lapel.position.set(jx, 1.12, 0.01);
+                        lapel.castShadow = true;
+                        root.add(lapel);
+
+                        const zipper = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.48, 0.02), zipMat);
+                        zipper.position.set(jx * 0.55, 1.12, 0.14);
+                        root.add(zipper);
+                    });
+
+                    const pendant = new THREE.Mesh(new THREE.OctahedronGeometry(0.045, 0), goldPendantMat);
+                    pendant.position.set(0, 1.28, 0.14);
+                    root.add(pendant);
+
+                    function makeLuciaArm(xOff) {
+                        const armPivot = new THREE.Group();
+                        armPivot.position.set(xOff, 1.32, 0);
+                        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.44, 0.12), jacketMat);
+                        arm.position.y = -0.2;
+                        arm.castShadow = true;
+                        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), tanMat);
+                        hand.position.y = -0.44;
+                        armPivot.add(arm, hand);
+                        root.add(armPivot);
+                        return armPivot;
+                    }
+                    parts.leftArm = makeLuciaArm(-0.28);
+                    parts.rightArm = makeLuciaArm(0.28);
+
+                    function makeLuciaLeg(xOff) {
+                        const legPivot = new THREE.Group();
+                        legPivot.position.set(xOff, 0.82, 0);
+                        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.8, 0.16), pantsMat);
+                        leg.position.y = -0.4;
+                        leg.castShadow = true;
+                        legPivot.add(leg);
+                        root.add(legPivot);
+                        return legPivot;
+                    }
+                    parts.leftLeg = makeLuciaLeg(-0.11);
+                    parts.rightLeg = makeLuciaLeg(0.11);
+                }
+
+                return { root, parts };
+            }
+
+            let activeChar = buildCharacterMesh(gameState.gender);
+            scene.add(activeChar.root);
+
+            function rebuildActiveCharacter() {
+                const prevPos = activeChar ? activeChar.root.position.clone() : new THREE.Vector3(18, 0, 26);
+                const prevRot = activeChar ? activeChar.root.rotation.y : 0;
+                if (activeChar && activeChar.root) scene.remove(activeChar.root);
+                activeChar = buildCharacterMesh(gameState.gender);
+                activeChar.root.position.copy(prevPos);
+                activeChar.root.rotation.y = prevRot;
+                activeChar.root.visible = !gameState.inVehicle;
+                scene.add(activeChar.root);
+            }
+
+            function placePlayerAtSpawn() {
+                gameState.inVehicle = false;
+                gameState.vehicleType = 'none';
+                activeChar.root.visible = true;
+                activeChar.root.position.set(18, 0, 26);
+            }
+
+            const lobbyPlayers = [];
+            function syncOnlineLobbyPlayers() {
+                while (lobbyPlayers.length > 0) {
+                    const p = lobbyPlayers.pop();
+                    if (p) scene.remove(p.mesh);
+                }
+                if (gameState.serverMode !== 'public') return;
+
+                const colors = [0x38bdf8, 0xf43f5e, 0xa855f7, 0x22c55e];
+                for (let i = 0; i < 4; i++) {
+                    const car = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.0, 0.72, 4.4),
+                        new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.25, metalness: 0.75 })
+                    );
+                    car.position.set(-100 + i * 100, 0.5, -80 + i * 60);
+                    car.castShadow = true;
+                    scene.add(car);
+                    lobbyPlayers.push({ mesh: car, angle: i * 1.5, radius: 95 + i * 25, speed: 0.28 + i * 0.04 });
+                }
+            }
+
+            const pursuitUnits = [];
+            const copBodyMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, metalness: 0.6 });
+            const copWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35, metalness: 0.5 });
+            const milMat = new THREE.MeshStandardMaterial({ color: 0x3f4d36, roughness: 0.7, metalness: 0.3 });
+
+            function spawnPursuitUnit(tier) {
+                const g = new THREE.Group();
+                const isHeli = tier >= 2 && Math.random() > 0.55;
+                if (isHeli) {
+                    const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.8, 5.2), tier >= 4 ? milMat : copBodyMat);
+                    hull.position.y = 22;
+                    g.add(hull);
+                    const rotor = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.14, 0.4), new THREE.MeshBasicMaterial({ color: 0x94a3b8 }));
+                    rotor.position.y = 23.1;
+                    g.add(rotor);
+                    g.userData = { isHeli: true, rotor };
+                } else {
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 4.4), tier >= 5 ? milMat : copWhiteMat);
+                    body.position.y = 0.7;
+                    body.castShadow = true;
+                    g.add(body);
+                    const siren = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.22, 0.35), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+                    siren.position.y = 1.25;
+                    g.add(siren);
+                    g.userData = { isHeli: false, siren };
+                }
+                const ang = Math.random() * Math.PI * 2;
+                const dist = 65 + Math.random() * 35;
+                g.position.set(activeChar.root.position.x + Math.cos(ang) * dist, 0, activeChar.root.position.z + Math.sin(ang) * dist);
+                scene.add(g);
+                pursuitUnits.push(g);
+            }
+
+            function syncPursuitUnits() {
+                const targetCount = gameState.godMode ? 0 : gameState.wantedLevel * 2;
+                while (pursuitUnits.length < targetCount) spawnPursuitUnit(gameState.wantedLevel);
+                while (pursuitUnits.length > targetCount) {
+                    const u = pursuitUnits.pop();
+                    if (u) scene.remove(u);
+                }
+            }
+
+            function setWantedLevel(lvl) {
+                const clamped = gameState.godMode ? 0 : Math.max(0, Math.min(5, Math.floor(lvl)));
+                gameState.wantedLevel = clamped;
+                gameState.wantedDecayTimer = clamped > 0 ? 11 : 0;
+                const container = document.getElementById('wantedContainer');
+                if (clamped <= 0) {
+                    container.classList.add('hidden');
+                } else {
+                    container.classList.remove('hidden');
+                    container.querySelectorAll('.star-icon').forEach((el) => {
+                        const idx = parseInt(el.getAttribute('data-star'), 10);
+                        el.classList.toggle('hidden', idx > clamped);
+                        el.classList.toggle('blink', idx <= clamped);
+                    });
+                }
+                syncPursuitUnits();
+            }
+
+            document.querySelectorAll('.wanted-set').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    setWantedLevel(parseInt(btn.getAttribute('data-wanted'), 10));
+                    showToast(`Fahndung: ${gameState.wantedLevel} ★`);
+                });
+            });
+
+            // HEISTS
+            function startGoldenJetHeist() {
+                gameState.inVehicle = true;
+                gameState.vehicleType = 'jet';
+                activeChar.root.visible = false;
+                if (!gameState.hasGoldenJet) {
+                    gameState.heistActive = 'jet_escape';
+                    gameState.heistReward = 100000;
+                    gameState.heistEscapeTimer = 14;
+                    setWantedLevel(3);
+                    document.getElementById('objectiveBanner').classList.remove('hidden');
+                    document.getElementById('objectiveTitle').textContent = 'Flughafen Jet-Heist (3★)';
+                    document.getElementById('objectiveDesc').textContent = 'Hebe ab und entkomme für +100.000 €!';
+                    showToast('Goldener Jet gekapert! Entkomme für 100.000 €!');
+                } else {
+                    showToast('Du fliegst deinen eigenen Goldenen Jet!');
+                }
+            }
+
+            const mazeHeistModal = document.getElementById('mazeHeistModal');
+            let selectedCrewSize = 3;
+            let hackedCamerasCount = 0;
+            let guardsRemaining = 3;
+            let hackTimerInterval = null;
+
+            function openMazeHeistModal() {
+                selectedCrewSize = 3;
+                hackedCamerasCount = 0;
+                guardsRemaining = 3;
+                document.getElementById('crewSizeValue').textContent = '3 Spieler';
+                document.getElementById('mazeCrewStep').classList.remove('hidden');
+                document.getElementById('mazeHackStep').classList.add('hidden');
+                document.getElementById('mazeTakedownStep').classList.add('hidden');
+                document.getElementById('panicCutsceneBox').classList.add('hidden');
+                mazeHeistModal.classList.remove('hidden');
+            }
+
+            document.getElementById('closeMazeModalBtn').addEventListener('click', () => {
+                clearInterval(hackTimerInterval);
+                mazeHeistModal.classList.add('hidden');
+            });
+
+            document.querySelectorAll('.crew-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    selectedCrewSize = parseInt(btn.getAttribute('data-crew'), 10);
+                    document.getElementById('crewSizeValue').textContent = `${selectedCrewSize} Spieler`;
+                    document.querySelectorAll('.crew-btn').forEach((b) => {
+                        const active = parseInt(b.getAttribute('data-crew'), 10) === selectedCrewSize;
+                        b.className = active
+                            ? 'crew-btn touch-btn py-2.5 rounded-xl bg-amber-400 text-slate-950 border border-amber-300 text-xs font-black'
+                            : 'crew-btn touch-btn py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-black';
+                    });
+                });
+            });
+
+            document.getElementById('startHackTerminalBtn').addEventListener('click', () => {
+                document.getElementById('mazeCrewStep').classList.add('hidden');
+                document.getElementById('mazeHackStep').classList.remove('hidden');
+                hackedCamerasCount = 0;
+                renderCameraTerminal();
+            });
+
+            function renderCameraTerminal() {
+                const grid = document.getElementById('cameraGrid');
+                document.getElementById('hackProgressText').textContent = `${hackedCamerasCount} / 4 Kameras`;
+                grid.innerHTML = '';
+
+                if (hackedCamerasCount >= 4) {
+                    clearInterval(hackTimerInterval);
+                    document.getElementById('mazeHackStep').classList.add('hidden');
+                    document.getElementById('mazeTakedownStep').classList.remove('hidden');
+                    renderGuardTakedowns();
+                    return;
+                }
+
+                const activeIdx = Math.floor(Math.random() * 4);
+                for (let i = 0; i < 4; i++) {
+                    const isTarget = i === activeIdx;
+                    const card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = isTarget
+                        ? 'touch-btn p-3 rounded-xl bg-rose-950 border border-rose-500 text-left'
+                        : 'p-3 rounded-xl bg-slate-900 border border-slate-700 text-left opacity-70';
+                    card.innerHTML = `
+                        <div class="text-[10px] font-black uppercase ${isTarget ? 'text-rose-300' : 'text-emerald-400'}">
+                            ${isTarget ? 'CAM-0' + (i + 1) + ' • AKTIV' : 'CAM-0' + (i + 1) + ' • OK'}
+                        </div>
+                        <div class="text-xs font-bold text-white mt-1">${isTarget ? 'Tippen zum Hacken' : 'Deaktiviert'}</div>
+                    `;
+                    if (isTarget) {
+                        card.addEventListener('click', () => {
+                            hackedCamerasCount += 1;
+                            renderCameraTerminal();
+                        });
+                    }
+                    grid.appendChild(card);
+                }
+                clearInterval(hackTimerInterval);
+                hackTimerInterval = setInterval(renderCameraTerminal, 1600);
+            }
+
+            function renderGuardTakedowns() {
+                const container = document.getElementById('guardButtons');
+                document.getElementById('guardsLeftText').textContent = guardsRemaining > 0 ? `${guardsRemaining} Wachen aktiv` : 'Wachen ausgeschaltet';
+                container.innerHTML = '';
+                if (guardsRemaining <= 0) {
+                    document.getElementById('panicCutsceneBox').classList.remove('hidden');
+                    return;
+                }
+                for (let g = 0; g < guardsRemaining; g++) {
+                    const gBtn = document.createElement('button');
+                    gBtn.type = 'button';
+                    gBtn.className = 'touch-btn p-3 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 border border-slate-600 text-xs font-black';
+                    gBtn.textContent = `Wache #${g + 1} ausschalten`;
+                    gBtn.addEventListener('click', () => {
+                        guardsRemaining -= 1;
+                        renderGuardTakedowns();
+                    });
+                    container.appendChild(gBtn);
+                }
+            }
+
+            document.getElementById('finishCutsceneEscapeBtn').addEventListener('click', () => {
+                mazeHeistModal.classList.add('hidden');
+                gameState.heistActive = 'maze_escape';
+                gameState.heistReward = 250000;
+                gameState.heistEscapeTimer = 16;
+                setWantedLevel(4);
+                document.getElementById('objectiveBanner').classList.remove('hidden');
+                document.getElementById('objectiveTitle').textContent = 'Maze Tower Flucht (4★)';
+                document.getElementById('objectiveDesc').textContent = 'Entkomme für +250.000 €!';
+                showToast('Panikknopf ausgelöst! Entkomme für 250.000 €!');
+            });
+
+            // CHAT & ADMIN
+            const chatDrawer = document.getElementById('chatDrawer');
+            const chatInput = document.getElementById('chatInput');
+            const adminModal = document.getElementById('adminModal');
+
+            function toggleChatDrawer(forceState) {
+                const willOpen = forceState !== undefined ? forceState : chatDrawer.classList.contains('hidden');
+                chatDrawer.classList.toggle('hidden', !willOpen);
+            }
+
+            document.getElementById('toggleChatBtn').addEventListener('click', () => toggleChatDrawer());
+            document.getElementById('closeChatBtn').addEventListener('click', () => toggleChatDrawer(false));
+
+            document.getElementById('chatForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const raw = chatInput.value.trim();
+                if (!raw) return;
+                const box = document.getElementById('chatMessages');
+                const row = document.createElement('div');
+                const author = document.createElement('span');
+                author.className = 'text-amber-400 font-bold';
+                author.textContent = `[${gameState.username}]: `;
+                const body = document.createElement('span');
+                body.className = 'text-slate-100';
+                body.textContent = raw;
+                row.appendChild(author);
+                row.appendChild(body);
+                box.appendChild(row);
+                box.scrollTop = box.scrollHeight;
+                chatInput.value = '';
+            });
+
+            function toggleAdminModal(forceState) {
+                const willOpen = forceState !== undefined ? forceState : adminModal.classList.contains('hidden');
+                adminModal.classList.toggle('hidden', !willOpen);
+            }
+
+            document.getElementById('openAdminBtn').addEventListener('click', () => toggleAdminModal());
+            document.getElementById('closeAdminBtn').addEventListener('click', () => toggleAdminModal(false));
+
+            function applyWeatherMode(isRain) {
+                gameState.rainWeather = Boolean(isRain);
+                rainLines.visible = gameState.rainWeather;
+                skyDome.material.map = createSkyTexture(gameState.rainWeather);
+                skyDome.material.needsUpdate = true;
+                scene.environment = buildEnvMap(gameState.rainWeather);
+
+                if (gameState.rainWeather) {
+                    scene.background.setHex(0x5a6573);
+                    scene.fog.color.setHex(0x5a6573);
+                    scene.fog.density = 0.0012;
+                    roadMat.roughness = 0.24;
+                    roadMat.metalness = 0.45;
+                    sunLight.intensity = 1.55;
+                } else {
+                    scene.background.setHex(0x88ccf7);
+                    scene.fog.color.setHex(0xcbe8fc);
+                    scene.fog.density = 0.00072;
+                    roadMat.roughness = 0.5;
+                    roadMat.metalness = 0.22;
+                    sunLight.intensity = 1.95;
+                }
+            }
+
+            document.getElementById('toggleFlyBtn').addEventListener('click', () => {
+                gameState.flyMode = !gameState.flyMode;
+                document.getElementById('flyStatusText').textContent = gameState.flyMode ? 'AN' : 'Aus';
+                showToast(`Fly-Mode ${gameState.flyMode ? 'AN' : 'AUS'}`);
+            });
+
+            document.getElementById('toggleGodBtn').addEventListener('click', () => {
+                gameState.godMode = !gameState.godMode;
+                if (gameState.godMode) setWantedLevel(0);
+                document.getElementById('godStatusText').textContent = gameState.godMode ? 'AN' : 'Aus';
+                showToast(`God-Mode ${gameState.godMode ? 'AN' : 'AUS'}`);
+            });
+
+            document.getElementById('addMoneyBtn').addEventListener('click', () => {
+                gameState.cash += 100000;
+                updateCashUI();
+                saveAccountToStorage(false);
+                showToast('+100.000 € gutgeschrieben!');
+            });
+
+            document.getElementById('toggleWeatherBtn').addEventListener('click', () => {
+                applyWeatherMode(!gameState.rainWeather);
+                saveAccountToStorage(false);
+            });
+
+            document.getElementById('cyclePaintBtn').addEventListener('click', () => {
+                applyVehiclePaint(gameState.paintIndex + 1);
+                saveAccountToStorage(false);
+                showToast(`Lackierung: ${paintPresets[gameState.paintIndex].name}`);
+            });
+
+            document.getElementById('toggleTurboBtn').addEventListener('click', () => {
+                gameState.twinTurbo = !gameState.twinTurbo;
+                document.getElementById('turboStatusText').textContent = gameState.twinTurbo ? 'Aktiv (Max Boost)' : 'Standard';
+                showToast(`Twin-Turbo ${gameState.twinTurbo ? 'AN' : 'AUS'}`);
+            });
+
+            document.getElementById('summonPorscheBtn').addEventListener('click', () => {
+                porscheGroup.position.set(activeChar.root.position.x + 4, 0, activeChar.root.position.z + 3);
+                porscheGroup.rotation.set(0, activeChar.root.rotation.y, 0);
+                carSpeed = 0;
+                toggleAdminModal(false);
+                showToast('Porsche 911 GT3 RS herbeigerufen!');
+            });
+
+            document.getElementById('summonLamboBtn').addEventListener('click', () => {
+                lamboGroup.position.set(activeChar.root.position.x - 4, 0, activeChar.root.position.z + 3);
+                lamboGroup.rotation.set(0, activeChar.root.rotation.y, 0);
+                carSpeed = 0;
+                toggleAdminModal(false);
+                showToast('Lamborghini Huracán herbeigerufen!');
+            });
+
+            function resetCurrentVehicle() {
+                if (gameState.inVehicle && gameState.vehicleType === 'lambo') {
+                    lamboGroup.position.set(14, 0, 22);
+                    lamboGroup.rotation.set(0, 0, 0);
+                    carSpeed = 0;
+                } else if (gameState.inVehicle && gameState.vehicleType === 'jet') {
+                    jetGroup.position.set(-450, 1.8, 330);
+                    jetGroup.rotation.set(0, -0.32, 0);
+                    jetSpeed = 0;
+                    jetPitch = 0;
+                } else {
+                    porscheGroup.position.set(22, 0, 22);
+                    porscheGroup.rotation.set(0, 0, 0);
+                    carSpeed = 0;
+                }
+                showToast('Fahrzeug zurückgesetzt!');
+            }
+
+            document.getElementById('resetVehiclePosBtn').addEventListener('click', () => {
+                resetCurrentVehicle();
+                toggleAdminModal(false);
+            });
+
+            // COLLISION HELPER
+            function isBlockedAt(x, z) {
+                for (let i = 0; i < buildingColliders.length; i++) {
+                    const c = buildingColliders[i];
+                    if (x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ) {
+                        return true;
+                    }
+                }
+                // Keep within island outer shoreline
+                const distFromIslandCenter = Math.hypot(x / 1.12, (z + 40) / 0.92);
+                return distFromIslandCenter > 775;
+            }
+
+            // TOUCH & KEYBOARD CONTROLS
+            const keys = {};
+            const touchState = { joyX: 0, joyY: 0, gas: false, brake: false, sprint: false };
+
+            const joystickZone = document.getElementById('joystickZone');
+            const joystickKnob = document.getElementById('joystickKnob');
+            let joyTouchId = null;
+
+            function updateJoystick(clientX, clientY) {
+                const rect = joystickZone.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const maxRadius = rect.width * 0.36;
+                let dx = clientX - centerX;
+                let dy = clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+                if (dist > maxRadius) {
+                    dx = (dx / dist) * maxRadius;
+                    dy = (dy / dist) * maxRadius;
+                }
+                joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+                touchState.joyX = dx / maxRadius;
+                touchState.joyY = -dy / maxRadius;
+            }
+
+            function resetJoystick() {
+                joyTouchId = null;
+                touchState.joyX = 0;
+                touchState.joyY = 0;
+                joystickKnob.style.transform = 'translate(0px, 0px)';
+            }
+
+            joystickZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (joyTouchId !== null) return;
+                const t = e.changedTouches[0];
+                joyTouchId = t.identifier;
+                updateJoystick(t.clientX, t.clientY);
+            }, { passive: false });
+
+            joystickZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    if (t.identifier === joyTouchId) updateJoystick(t.clientX, t.clientY);
+                }
+            }, { passive: false });
+
+            joystickZone.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === joyTouchId) resetJoystick();
+                }
+            });
+            joystickZone.addEventListener('touchcancel', resetJoystick);
+
+            function bindHoldButton(btnId, stateKey) {
+                const btn = document.getElementById(btnId);
+                const onStart = (e) => {
+                    e.preventDefault();
+                    touchState[stateKey] = true;
+                    btn.classList.add('pressed');
+                };
+                const onEnd = (e) => {
+                    if (e) e.preventDefault();
+                    touchState[stateKey] = false;
+                    btn.classList.remove('pressed');
+                };
+                btn.addEventListener('touchstart', onStart, { passive: false });
+                btn.addEventListener('touchend', onEnd, { passive: false });
+                btn.addEventListener('touchcancel', onEnd);
+                btn.addEventListener('mousedown', onStart);
+                btn.addEventListener('mouseup', onEnd);
+                btn.addEventListener('mouseleave', onEnd);
+            }
+
+            bindHoldButton('touchGasBtn', 'gas');
+            bindHoldButton('touchBrakeBtn', 'brake');
+            bindHoldButton('touchSprintBtn', 'sprint');
+
+            document.getElementById('touchEnterBtn').addEventListener('click', () => handleInteractOrVehicleToggle());
+            document.getElementById('interactPrompt').addEventListener('click', () => handleInteractOrVehicleToggle());
+
+            let camYaw = 0;
+            let camPitch = 0.28;
+            let camTouchId = null;
+            let lastCamX = 0;
+            let lastCamY = 0;
+            let isMouseDragging = false;
+
+            canvas.addEventListener('touchstart', (e) => {
+                if (camTouchId !== null) return;
+                const t = e.changedTouches[0];
+                camTouchId = t.identifier;
+                lastCamX = t.clientX;
+                lastCamY = t.clientY;
+            }, { passive: true });
+
+            canvas.addEventListener('touchmove', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    if (t.identifier === camTouchId) {
+                        const dx = t.clientX - lastCamX;
+                        const dy = t.clientY - lastCamY;
+                        lastCamX = t.clientX;
+                        lastCamY = t.clientY;
+                        camYaw -= dx * 0.0065;
+                        camPitch = Math.max(-0.32, Math.min(1.05, camPitch + dy * 0.005));
+                    }
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === camTouchId) camTouchId = null;
+                }
+            });
+
+            canvas.addEventListener('mousedown', (e) => {
+                isMouseDragging = true;
+                lastCamX = e.clientX;
+                lastCamY = e.clientY;
+            });
+            window.addEventListener('mouseup', () => { isMouseDragging = false; });
+            window.addEventListener('mousemove', (e) => {
+                if (!isMouseDragging) return;
+                const dx = e.clientX - lastCamX;
+                const dy = e.clientY - lastCamY;
+                lastCamX = e.clientX;
+                lastCamY = e.clientY;
+                camYaw -= dx * 0.0055;
+                camPitch = Math.max(-0.32, Math.min(1.05, camPitch + dy * 0.0045));
+            });
+
+            window.addEventListener('keydown', (e) => {
+                const tag = document.activeElement && document.activeElement.tagName;
+                if (e.key.toLowerCase() === 't' && tag !== 'INPUT') {
+                    e.preventDefault();
+                    toggleChatDrawer(true);
+                    chatInput.focus();
+                    return;
+                }
+                if (e.key.toLowerCase() === 'm' && tag !== 'INPUT') {
+                    e.preventDefault();
+                    toggleAdminModal();
+                    return;
+                }
+                if (tag === 'INPUT') return;
+                keys[e.code] = true;
+                if (!hudOverlay.classList.contains('hidden')) {
+                    if (e.code === 'KeyE' || e.code === 'KeyF') {
+                        handleInteractOrVehicleToggle();
+                    } else if (e.code === 'KeyR') {
+                        resetCurrentVehicle();
+                    }
+                }
+            });
+            window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+            function handleInteractOrVehicleToggle() {
+                if (gameState.inVehicle) {
+                    const vGroup = gameState.vehicleType === 'lambo'
+                        ? lamboGroup
+                        : gameState.vehicleType === 'jet'
+                            ? jetGroup
+                            : porscheGroup;
+                    if (gameState.vehicleType === 'jet' && jetGroup.position.y >= 3.5) {
+                        showToast('Lande zuerst den Jet, bevor du aussteigst!');
+                        return;
+                    }
+                    gameState.inVehicle = false;
+                    gameState.vehicleType = 'none';
+                    activeChar.root.visible = true;
+                    activeChar.root.position.set(vGroup.position.x + 2.6, 0, vGroup.position.z);
+                    showToast('Ausgestiegen.');
+                    return;
+                }
+
+                const pPos = activeChar.root.position;
+                const dPorsche = pPos.distanceTo(porscheGroup.position);
+                const dLambo = pPos.distanceTo(lamboGroup.position);
+                const dJet = pPos.distanceTo(jetGroup.position);
+                const dMaze = pPos.distanceTo(new THREE.Vector3(MAZE_POS.x, 0, MAZE_POS.z + 34));
+
+                if (dJet < 11) {
+                    startGoldenJetHeist();
+                } else if (dPorsche <= dLambo && dPorsche < 5.8) {
+                    gameState.inVehicle = true;
+                    gameState.vehicleType = 'porsche';
+                    activeChar.root.visible = false;
+                    showToast('Porsche 911 GT3 RS gestartet!');
+                } else if (dLambo < 5.8) {
+                    gameState.inVehicle = true;
+                    gameState.vehicleType = 'lambo';
+                    activeChar.root.visible = false;
+                    showToast('Lamborghini Huracán V10 gestartet!');
+                } else if (dMaze < 9.5) {
+                    openMazeHeistModal();
+                }
+            }
+
+            // MINIMAP & ANIMATION LOOP
+            const minimapCanvas = document.getElementById('minimapCanvas');
+            const minimapCtx = minimapCanvas.getContext('2d');
+
+            function drawMinimap() {
+                const w = minimapCanvas.width = 140;
+                const h = minimapCanvas.height = 140;
+                minimapCtx.clearRect(0, 0, w, h);
+                minimapCtx.fillStyle = '#0f2942';
+                minimapCtx.fillRect(0, 0, w, h);
+
+                const center = gameState.inVehicle
+                    ? (gameState.vehicleType === 'jet' ? jetGroup.position : gameState.vehicleType === 'lambo' ? lamboGroup.position : porscheGroup.position)
+                    : activeChar.root.position;
+
+                const scale = 0.17;
+                const toMap = (wx, wz) => ({
+                    x: w / 2 + (wx - center.x) * scale,
+                    y: h / 2 + (wz - center.z) * scale
+                });
+
+                const isl = toMap(0, -40);
+                minimapCtx.fillStyle = '#3b4754';
+                minimapCtx.beginPath();
+                minimapCtx.ellipse(isl.x, isl.y, 820 * scale, 720 * scale, 0, 0, Math.PI * 2);
+                minimapCtx.fill();
+
+                const mazeM = toMap(MAZE_POS.x, MAZE_POS.z);
+                minimapCtx.fillStyle = '#facc15';
+                minimapCtx.beginPath();
+                minimapCtx.arc(mazeM.x, mazeM.y, 4, 0, Math.PI * 2);
+                minimapCtx.fill();
+
+                const jetM = toMap(jetGroup.position.x, jetGroup.position.z);
+                minimapCtx.fillStyle = '#38bdf8';
+                minimapCtx.beginPath();
+                minimapCtx.arc(jetM.x, jetM.y, 4, 0, Math.PI * 2);
+                minimapCtx.fill();
+
+                pursuitUnits.forEach((u) => {
+                    const um = toMap(u.position.x, u.position.z);
+                    minimapCtx.fillStyle = '#ef4444';
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(um.x, um.y, 2.8, 0, Math.PI * 2);
+                    minimapCtx.fill();
+                });
+
+                minimapCtx.save();
+                minimapCtx.translate(w / 2, h / 2);
+                minimapCtx.rotate(-camYaw);
+                minimapCtx.fillStyle = '#ffffff';
+                minimapCtx.beginPath();
+                minimapCtx.moveTo(0, -5.5);
+                minimapCtx.lineTo(4, 4.5);
+                minimapCtx.lineTo(0, 2);
+                minimapCtx.lineTo(-4, 4.5);
+                minimapCtx.closePath();
+                minimapCtx.fill();
+                minimapCtx.restore();
+            }
+
+            let carSpeed = 0;
+            let carSteer = 0;
+            let jetSpeed = 0;
+            let jetPitch = 0;
+            const clock = new THREE.Clock();
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const dt = Math.min(clock.getDelta(), 0.05);
+                const elapsed = clock.getElapsedTime();
+
+                if (gameState.rainWeather && rainLines.visible) {
+                    const posAttr = rainGeo.getAttribute('position');
+                    const anchor = gameState.inVehicle
+                        ? (gameState.vehicleType === 'jet' ? jetGroup.position : gameState.vehicleType === 'lambo' ? lamboGroup.position : porscheGroup.position)
+                        : activeChar.root.position;
+                    for (let i = 0; i < rainCount; i++) {
+                        let y = posAttr.getY(i * 2) - 46 * dt;
+                        let x = posAttr.getX(i * 2) - 5 * dt;
+                        if (y < 0) {
+                            y = 85 + Math.random() * 20;
+                            x = anchor.x + (Math.random() - 0.5) * 240;
+                            const z = anchor.z + (Math.random() - 0.5) * 240;
+                            posAttr.setXYZ(i * 2, x, y, z);
+                            posAttr.setXYZ(i * 2 + 1, x - 0.3, y - 2.4, z + 0.12);
+                        } else {
+                            const z = posAttr.getZ(i * 2);
+                            posAttr.setXYZ(i * 2, x, y, z);
+                            posAttr.setXYZ(i * 2 + 1, x - 0.3, y - 2.4, z + 0.12);
+                        }
+                    }
+                    posAttr.needsUpdate = true;
+                }
+
+                lobbyPlayers.forEach((lp) => {
+                    lp.angle += lp.speed * dt;
+                    lp.mesh.position.x = Math.cos(lp.angle) * lp.radius;
+                    lp.mesh.position.z = Math.sin(lp.angle) * lp.radius;
+                    lp.mesh.rotation.y = -lp.angle;
+                });
+
+                if (gameState.heistActive) {
+                    gameState.heistEscapeTimer -= dt;
+                    if (gameState.heistEscapeTimer <= 0) {
+                        const reward = gameState.heistReward;
+                        const wasJet = gameState.heistActive === 'jet_escape';
+                        gameState.cash += reward;
+                        if (wasJet) gameState.hasGoldenJet = true;
+                        gameState.heistActive = null;
+                        gameState.heistReward = 0;
+                        setWantedLevel(0);
+                        updateCashUI();
+                        saveAccountToStorage(false);
+                        document.getElementById('objectiveBanner').classList.add('hidden');
+                        showToast(
+                            wasJet
+                                ? `Jet-Heist geschafft! +${reward.toLocaleString('de-DE')} €!`
+                                : `Maze Tower Heist geschafft! +${reward.toLocaleString('de-DE')} €!`
+                        );
+                    }
+                }
+
+                if (gameState.wantedLevel > 0 && !gameState.heistActive && !gameState.godMode) {
+                    gameState.wantedDecayTimer -= dt;
+                    if (gameState.wantedDecayTimer <= 0) setWantedLevel(gameState.wantedLevel - 1);
+                }
+
+                const curPos = gameState.inVehicle
+                    ? (gameState.vehicleType === 'jet' ? jetGroup.position : gameState.vehicleType === 'lambo' ? lamboGroup.position : porscheGroup.position)
+                    : activeChar.root.position;
+
+                pursuitUnits.forEach((unit, idx) => {
+                    const dx = curPos.x - unit.position.x;
+                    const dz = curPos.z - unit.position.z;
+                    const dist = Math.hypot(dx, dz) || 1;
+                    if (unit.userData.isHeli) {
+                        unit.userData.rotor.rotation.y += 28 * dt;
+                        unit.position.y += ((curPos.y + 22) - unit.position.y) * 2 * dt;
+                        if (dist > 28) {
+                            unit.position.x += (dx / dist) * 28 * dt;
+                            unit.position.z += (dz / dist) * 28 * dt;
+                        }
+                    } else {
+                        if (dist > 14) {
+                            unit.position.x += (dx / dist) * (22 + gameState.wantedLevel * 2.5) * dt;
+                            unit.position.z += (dz / dist) * (22 + gameState.wantedLevel * 2.5) * dt;
+                        }
+                        unit.rotation.y = Math.atan2(dx, dz);
+                        if (unit.userData.siren) {
+                            unit.userData.siren.material.color.setHex(Math.floor(elapsed * 10 + idx) % 2 === 0 ? 0xef4444 : 0x3b82f6);
+                        }
+                    }
+                });
+
+                if (!hudOverlay.classList.contains('hidden')) {
+                    const speedEl = document.getElementById('speedLabel');
+                    const zoneEl = document.getElementById('zoneLabel');
+                    const promptEl = document.getElementById('interactPrompt');
+
+                    const forwardInput = (keys['KeyW'] || keys['ArrowUp'] || touchState.gas)
+                        ? 1
+                        : (keys['KeyS'] || keys['ArrowDown'] || touchState.brake)
+                            ? -1
+                            : Math.abs(touchState.joyY) > 0.14
+                                ? touchState.joyY
+                                : 0;
+
+                    const steerInput = (keys['KeyA'] || keys['ArrowLeft'])
+                        ? 1
+                        : (keys['KeyD'] || keys['ArrowRight'])
+                            ? -1
+                            : Math.abs(touchState.joyX) > 0.12
+                                ? -touchState.joyX
+                                : 0;
+
+                    const boostInput = Boolean(keys['ShiftLeft'] || keys['ShiftRight'] || keys['Space'] || touchState.sprint);
+
+                    if (gameState.flyMode) {
+                        const flySpeed = (boostInput ? 68 : 34) * dt;
+                        const fwd = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
+                        const right = new THREE.Vector3(Math.cos(camYaw), 0, -Math.sin(camYaw));
+                        curPos.addScaledVector(fwd, forwardInput * flySpeed);
+                        curPos.addScaledVector(right, -steerInput * flySpeed);
+                        if (boostInput) curPos.y += flySpeed * 0.7;
+                        speedEl.textContent = 'FLY-MODE';
+                    } else if (gameState.inVehicle && (gameState.vehicleType === 'porsche' || gameState.vehicleType === 'lambo')) {
+                        const vGroup = gameState.vehicleType === 'lambo' ? lamboGroup : porscheGroup;
+                        const vWheels = gameState.vehicleType === 'lambo' ? lamboWheels : porscheWheels;
+                        const vSteer = gameState.vehicleType === 'lambo' ? lamboFrontSteer : porscheFrontSteer;
+                        const maxSpd = gameState.vehicleType === 'lambo' ? 84 : 78;
+                        const accel = (gameState.twinTurbo ? 76 : 50) * (boostInput ? 1.25 : 1);
+
+                        if (forwardInput > 0) {
+                            carSpeed = Math.min(maxSpd, carSpeed + accel * forwardInput * dt);
+                        } else if (forwardInput < 0) {
+                            // Responsive braking when moving forward, smooth reverse when stopped/reversing
+                            const brakeRate = carSpeed > 1 ? accel * 1.65 : accel * 0.85;
+                            carSpeed = Math.max(-32, carSpeed + brakeRate * forwardInput * dt);
+                        } else {
+                            carSpeed *= Math.pow(0.22, dt);
+                        }
+
+                        carSteer += (steerInput * 0.52 - carSteer) * 12 * dt;
+                        if (Math.abs(carSpeed) > 0.2) {
+                            const dir = carSpeed >= 0 ? 1 : -1;
+                            const turnAuthority = Math.min(1.15, Math.max(0.35, Math.abs(carSpeed) / 14));
+                            vGroup.rotation.y += carSteer * 2.15 * turnAuthority * dir * dt;
+                        }
+
+                        const nextX = vGroup.position.x + Math.sin(vGroup.rotation.y) * carSpeed * dt;
+                        const nextZ = vGroup.position.z + Math.cos(vGroup.rotation.y) * carSpeed * dt;
+
+                        if (!isBlockedAt(nextX, nextZ)) {
+                            vGroup.position.x = nextX;
+                            vGroup.position.z = nextZ;
+                        } else {
+                            carSpeed = -carSpeed * 0.35;
+                        }
+                        vGroup.position.y = 0;
+
+                        vSteer.forEach((p) => { p.rotation.y = carSteer; });
+                        vWheels.forEach((w) => { w.rotation.x += (carSpeed * dt) / 0.42; });
+
+                        const vLabel = gameState.vehicleType === 'lambo' ? 'Lamborghini Huracán' : 'Porsche 911 GT3 RS';
+                        speedEl.textContent = `${Math.round(Math.abs(carSpeed) * 3.3)} km/h • ${vLabel}`;
+                    } else if (gameState.inVehicle && gameState.vehicleType === 'jet') {
+                        if (forwardInput > 0) jetSpeed = Math.min(122, jetSpeed + 62 * dt);
+                        else if (forwardInput < 0) jetSpeed = Math.max(14, jetSpeed - 38 * dt);
+                        else jetSpeed = Math.max(26, jetSpeed - 8 * dt);
+
+                        jetGroup.rotation.y += steerInput * 1.35 * dt;
+                        const climb = boostInput ? 26 : (keys['ControlLeft'] ? -18 : 0);
+                        jetPitch += ((climb > 0 ? -0.22 : climb < 0 ? 0.18 : 0) - jetPitch) * 4 * dt;
+                        jetGroup.rotation.x = jetPitch;
+
+                        jetGroup.position.x += Math.sin(jetGroup.rotation.y) * jetSpeed * dt;
+                        jetGroup.position.z += Math.cos(jetGroup.rotation.y) * jetSpeed * dt;
+                        jetGroup.position.y = Math.max(1.8, Math.min(280, jetGroup.position.y + climb * dt));
+
+                        speedEl.textContent = `${Math.round(jetSpeed * 4.5)} kn • Goldener Jet (${Math.round(jetGroup.position.y)}m)`;
+                    } else {
+                        const moveSpeed = (boostInput ? 13.5 : 8.2) * dt;
+                        const moveX = -steerInput;
+                        const moveZ = forwardInput;
+                        const mag = Math.hypot(moveX, moveZ);
+
+                        if (mag > 0.08) {
+                            const nx = moveX / Math.max(1, mag);
+                            const nz = moveZ / Math.max(1, mag);
+                            const sinY = Math.sin(camYaw);
+                            const cosY = Math.cos(camYaw);
+                            const worldDx = nx * cosY + nz * sinY;
+                            const worldDz = -nx * sinY + nz * cosY;
+
+                            const tryX = activeChar.root.position.x + worldDx * moveSpeed;
+                            const tryZ = activeChar.root.position.z + worldDz * moveSpeed;
+                            if (!isBlockedAt(tryX, activeChar.root.position.z)) activeChar.root.position.x = tryX;
+                            if (!isBlockedAt(activeChar.root.position.x, tryZ)) activeChar.root.position.z = tryZ;
+
+                            activeChar.root.rotation.y = Math.atan2(worldDx, worldDz);
+
+                            const swing = Math.sin(elapsed * 11) * 0.55;
+                            if (activeChar.parts.leftLeg) activeChar.parts.leftLeg.rotation.x = swing;
+                            if (activeChar.parts.rightLeg) activeChar.parts.rightLeg.rotation.x = -swing;
+                            if (activeChar.parts.leftArm) activeChar.parts.leftArm.rotation.x = -swing * 0.7;
+                            if (activeChar.parts.rightArm) activeChar.parts.rightArm.rotation.x = swing * 0.7;
+                        } else {
+                            if (activeChar.parts.leftLeg) activeChar.parts.leftLeg.rotation.x *= 0.82;
+                            if (activeChar.parts.rightLeg) activeChar.parts.rightLeg.rotation.x *= 0.82;
+                            if (activeChar.parts.leftArm) activeChar.parts.leftArm.rotation.x *= 0.82;
+                            if (activeChar.parts.rightArm) activeChar.parts.rightArm.rotation.x *= 0.82;
+                        }
+                        speedEl.textContent = `${mag > 0.08 ? (boostInput ? '19 km/h' : '8 km/h') : '0 km/h'} • Zu Fuß`;
+                    }
+
+                    if (curPos.distanceTo(AIRPORT_POS) < 220) zoneEl.textContent = 'Küsten-Flughafen';
+                    else if (curPos.distanceTo(MAZE_POS) < 85) zoneEl.textContent = 'Maze Tower • Zentrum';
+                    else if (curPos.z < -420) zoneEl.textContent = 'Nördliche Bergkette';
+                    else if (curPos.x > 330 && curPos.z < -40) zoneEl.textContent = 'Östliche Wüste';
+                    else zoneEl.textContent = 'Los Santos Zentrum';
+
+                    if (!gameState.inVehicle) {
+                        const dPorsche = curPos.distanceTo(porscheGroup.position);
+                        const dLambo = curPos.distanceTo(lamboGroup.position);
+                        const dJet = curPos.distanceTo(jetGroup.position);
+                        const dMaze = curPos.distanceTo(new THREE.Vector3(MAZE_POS.x, 0, MAZE_POS.z + 34));
+
+                        if (dJet < 11) {
+                            promptEl.textContent = '✈️ Goldenen Jet kapern (+100.000 €)';
+                            promptEl.classList.remove('hidden');
+                        } else if (dPorsche <= dLambo && dPorsche < 5.8) {
+                            promptEl.textContent = '🏎️ In Porsche 911 GT3 RS einsteigen';
+                            promptEl.classList.remove('hidden');
+                        } else if (dLambo < 5.8) {
+                            promptEl.textContent = '🔥 In Lamborghini Huracán einsteigen';
+                            promptEl.classList.remove('hidden');
+                        } else if (dMaze < 9.5) {
+                            promptEl.textContent = '🏦 Maze Tower Bank-Heist starten (+250.000 €)';
+                            promptEl.classList.remove('hidden');
+                        } else {
+                            promptEl.classList.add('hidden');
+                        }
+                    } else if (gameState.vehicleType !== 'jet' || jetGroup.position.y < 3.5) {
+                        promptEl.textContent = '🚪 Aussteigen';
+                        promptEl.classList.remove('hidden');
+                    } else {
+                        promptEl.classList.add('hidden');
+                    }
+
+                    const distCam = gameState.inVehicle && gameState.vehicleType === 'jet' ? 24 : 9.2;
+                    const heightCam = gameState.inVehicle && gameState.vehicleType === 'jet' ? 7 : 3.1;
+                    const desiredX = curPos.x - Math.sin(camYaw) * Math.cos(camPitch) * distCam;
+                    const desiredY = Math.max(1.2, curPos.y + heightCam + Math.sin(camPitch) * distCam);
+                    const desiredZ = curPos.z - Math.cos(camYaw) * Math.cos(camPitch) * distCam;
+                    camera.position.lerp(new THREE.Vector3(desiredX, desiredY, desiredZ), 0.18);
+                    camera.lookAt(curPos.x, curPos.y + 1.5, curPos.z);
+
+                    drawMinimap();
+                } else {
+                    camera.position.set(
+                        porscheGroup.position.x + Math.sin(elapsed * 0.28) * 11,
+                        4.8,
+                        porscheGroup.position.z + Math.cos(elapsed * 0.28) * 11
+                    );
+                    camera.lookAt(porscheGroup.position.x - 3, 1.0, porscheGroup.position.z);
+                }
+
+                skyDome.position.copy(camera.position);
+                renderer.render(scene, camera);
+            }
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate();
+        })();
+    </script>
+</body>
+</html>
